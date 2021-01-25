@@ -12,7 +12,11 @@ FULL_NAME_KEY = "full_name"
 PERSON_ID_KEY = "PERSON_ID"
 SEASON_2020 = "2020"
 MINUTES_COLUMN = "MIN"
+FIELD_GOALS_MADE_COLUMN = "FGM"
+FIELD_GOAL_ATTEMPTED_COLUMN = "FGA"
 FIELD_GOAL_PERCENTAGE_COLUMN = "FG_PCT"
+FREE_THROW_MADE_COLUMN = "FTM"
+FREE_THROW_ATTEMPTED_COLUMN = "FTA"
 FREE_THROW_PERCENTAGE_COLUMN = "FT_PCT"
 THREES_MADE_COLUMN = "FG3M"
 POINTS_COLUMN = "PTS"
@@ -29,8 +33,13 @@ COMMON_ALL_PLAYERS ="CommonAllPlayers"
 
 
 THREE_DECIMAL_FORMAT = "{:,.3f}".format
-ONE_DECIMAL_FORMAT = "{:,.1f}".format
+TWO_DECIMAL_FORMAT = "{:,.2f}".format
 
+CALCULATING_COLUMNS = [FIELD_GOALS_MADE_COLUMN, FIELD_GOAL_ATTEMPTED_COLUMN,
+                    FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_MADE_COLUMN,
+                    FREE_THROW_ATTEMPTED_COLUMN, FREE_THROW_PERCENTAGE_COLUMN,
+                    THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
+                    STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
 NINE_CAT_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN,
                     THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
                     STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
@@ -54,10 +63,25 @@ def move_column_inplace(dataframe, column, position):
     dataframe.insert(position, column.name, column)
 
 
+def true_percentage(dataframe, pct_category):
+    no_mean_row_dataframe = dataframe.drop(MEAN_ROW)
+    if pct_category == FIELD_GOAL_PERCENTAGE_COLUMN:
+        true_field_goal_pct = no_mean_row_dataframe[FIELD_GOALS_MADE_COLUMN].mean() / \
+                              no_mean_row_dataframe[FIELD_GOAL_ATTEMPTED_COLUMN].mean()
+        dataframe.at[MEAN_ROW, FIELD_GOAL_PERCENTAGE_COLUMN] = true_field_goal_pct
+
+    else:
+        true_free_throw_pct = no_mean_row_dataframe[FREE_THROW_MADE_COLUMN].mean() / \
+            no_mean_row_dataframe[FREE_THROW_ATTEMPTED_COLUMN].mean()
+        dataframe.at[MEAN_ROW, FREE_THROW_PERCENTAGE_COLUMN] = true_free_throw_pct
+
+    return dataframe
+
+
 def format_dataframe_decimals(dataframe):
     dataframe[THREE_DECIMAL_COLUMNS] = dataframe[THREE_DECIMAL_COLUMNS].applymap \
         (THREE_DECIMAL_FORMAT)
-    dataframe[ONE_DECIMAL_COLUMNS] = dataframe[ONE_DECIMAL_COLUMNS].applymap(ONE_DECIMAL_FORMAT)
+    dataframe[ONE_DECIMAL_COLUMNS] = dataframe[ONE_DECIMAL_COLUMNS].applymap(TWO_DECIMAL_FORMAT)
 
     return dataframe
 
@@ -75,14 +99,19 @@ def player_average_9cat_stats(player_name, player_data_dict):
     player_game_log_dataframe = player_game_log.get_data_frames()[0]
 
     # Filter for games played
-    player_game_log_dataframe = player_game_log_dataframe[player_game_log_dataframe[
-                                                              MINUTES_COLUMN] >= 1]
+    player_game_log_dataframe = \
+    player_game_log_dataframe[player_game_log_dataframe[MINUTES_COLUMN] >= 1]
+
+    # Find true percentages
+    player_game_log_dataframe = player_game_log_dataframe[CALCULATING_COLUMNS]
+    player_game_log_dataframe.loc[MEAN_ROW] = player_game_log_dataframe.mean()
+    player_game_log_dataframe = true_percentage(player_game_log_dataframe,
+                                                FIELD_GOAL_PERCENTAGE_COLUMN)
+    player_game_log_dataframe = true_percentage(player_game_log_dataframe,
+                                                FREE_THROW_PERCENTAGE_COLUMN)
 
     # Filter for 9cat columns
     player_9cat = player_game_log_dataframe[NINE_CAT_COLUMNS]
-
-    # Find average stats
-    player_9cat.loc[MEAN_ROW] = player_9cat.mean()
 
     # Formatting columns
     player_9cat = format_dataframe_decimals(player_9cat)
@@ -98,6 +127,7 @@ def player_average_9cat_stats(player_name, player_data_dict):
     move_column_inplace(player_9cat_season_average, PLAYER_COLUMN, 0)
 
     return player_9cat_season_average
+
 
 
 def get_player_9cat_season_average(player_name):
