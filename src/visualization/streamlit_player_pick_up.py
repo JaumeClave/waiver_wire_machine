@@ -25,17 +25,30 @@ TEAM_NAME_KEY = "TEAM_NAME"
 COMMON_PLAYER_INFO = "CommonPlayerInfo"
 JERSEY_KEY = "JERSEY"
 DISPLAY_FIRST_LAST = "DISPLAY_FIRST_LAST"
-EDITORIAL_TEAM_FULL_NAME = "editorial_team_full_name"
-UNIFORM_NUMBER = "uniform_number"
-COMMON_ALL_PLAYERS ="CommonAllPlayers"
-PERSON_ID_KEY = "PERSON_ID"
-TEAM_CITY_KEY = "TEAM_CITY"
-TEAM_NAME_KEY = "TEAM_NAME"
-COMMON_PLAYER_INFO = "CommonPlayerInfo"
-JERSEY_KEY = "JERSEY"
-DISPLAY_FIRST_LAST = "DISPLAY_FIRST_LAST"
 RANK_SUFFIX ="_RANK"
+FIELD_GOALS_MADE_COLUMN = "FGM"
+FIELD_GOAL_ATTEMPTED_COLUMN = "FGA"
+FIELD_GOAL_PERCENTAGE_COLUMN = "FG_PCT"
+FREE_THROW_MADE_COLUMN = "FTM"
+FREE_THROW_ATTEMPTED_COLUMN = "FTA"
+FREE_THROW_PERCENTAGE_COLUMN = "FT_PCT"
+THREES_MADE_COLUMN = "FG3M"
+POINTS_COLUMN = "PTS"
+REBOUNDS_COLUMN = "REB"
+ASSITS_COLUMN = "AST"
+STEALS_COLUMN = "STL"
+BLOCKS_COLUMN = "BLK"
+TURNOVERS_COLUMN = "TOV"
 
+THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
+ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
+                       STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
+
+STREAMLIT_TABLE_FORMAT = {"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT,
+                          "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT, "FG3M" : p9ca.TWO_DECIMAL_FORMAT,
+                          "PTS" : p9ca.TWO_DECIMAL_FORMAT, "REB" : p9ca.TWO_DECIMAL_FORMAT,
+                          "AST" : p9ca.TWO_DECIMAL_FORMAT, "STL" : p9ca.TWO_DECIMAL_FORMAT,
+                          "BLK" : p9ca.TWO_DECIMAL_FORMAT, "TOV" : p9ca.TWO_DECIMAL_FORMAT}
 
 # Team dictionaries
 LALALAND = {'team_key': '402.l.55374.t.1', 'name': 'LaLaLand'}
@@ -371,35 +384,52 @@ def color_negative_red(val):
     the css property `'color: red'` for negative
     strings, black otherwise.
     """
-    color = 'red' if val < 0 else 'green'
+    color = '#EC7063' if val < 0 else '#52BE80'
     return 'color: %s' % color
 
-FIELD_GOALS_MADE_COLUMN = "FGM"
-FIELD_GOAL_ATTEMPTED_COLUMN = "FGA"
-FIELD_GOAL_PERCENTAGE_COLUMN = "FG_PCT"
-FREE_THROW_MADE_COLUMN = "FTM"
-FREE_THROW_ATTEMPTED_COLUMN = "FTA"
-FREE_THROW_PERCENTAGE_COLUMN = "FT_PCT"
-THREES_MADE_COLUMN = "FG3M"
-POINTS_COLUMN = "PTS"
-REBOUNDS_COLUMN = "REB"
-ASSITS_COLUMN = "AST"
-STEALS_COLUMN = "STL"
-BLOCKS_COLUMN = "BLK"
-TURNOVERS_COLUMN = "TOV"
 
-THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
-ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
-                       STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
+def get_team_id_from_team_name(team_name):
+
+    return "".join([x[TEAM_KEY] for x in league_team_list if x[NAME_KEY] == team_name])
 
 
-st.title('Add Free Agent')
+def team_player_list(team_id):
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
+    team = league.to_team(team_id)
+    team_roster = team.roster()
+    player_in_team_list = [player[NAME_KEY] for player in team_roster]
+
+    return player_in_team_list
 
 
-player_to_drop = st.text_input("Player to drop from team", "Nikola Jokic")
-player_to_add = st.text_input("Player to add to team", "James Harden")
+def streamlit_return_players_on_team(team_name):
 
-if st.button('Compare Transaction 9Cat Stats'):
+    team_id = get_team_id_from_team_name(team_name)
+    player_list = team_player_list(team_id)
+
+    return player_list
+
+
+# Streamlit Code
+st.title('Free Agent Machine')
+
+# Sidebar select Team, Player to Drop and Player to Add
+team = st.sidebar.selectbox(
+     'Lebrontourage Teams',
+     (AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY], EL_LADRON_DE_CABRAS[NAME_KEY],
+      LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY], MCCURRY[NAME_KEY],
+      NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY], SWAGGY_P[NAME_KEY],
+      TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY], YOBITCH_TOPPIN_ME[NAME_KEY]))
+
+players = streamlit_return_players_on_team(team)
+
+player_to_drop = st.sidebar.selectbox(
+     "Player to Drop", players)
+player_to_add = st.sidebar.text_input("Player to Add", "James Harden")
+
+# Compute Transaction
+if st.sidebar.button('Compare!'):
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
     current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
@@ -407,26 +437,12 @@ if st.button('Compare Transaction 9Cat Stats'):
         (NUNN_OF_YALL_BETTA, player_to_drop, player_to_add, visualise=False)
 
     st.write("Current Roster 9Cat Averages")
-    st.table(current_team_9cat_averages.style.format({"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                                                      "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                     "FG3M" : p9ca.TWO_DECIMAL_FORMAT, "PTS" : p9ca.TWO_DECIMAL_FORMAT,
-                     "REB" : p9ca.TWO_DECIMAL_FORMAT, "AST" : p9ca.TWO_DECIMAL_FORMAT,
-                     "STL" : p9ca.TWO_DECIMAL_FORMAT, "BLK" : p9ca.TWO_DECIMAL_FORMAT,
-                     "TOV" : p9ca.TWO_DECIMAL_FORMAT}))
+    st.table(current_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
     st.write("New Roster 9Cat Averages")
-    st.table(new_team_9cat_averages.style.format({"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                                                  "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                     "FG3M" : p9ca.TWO_DECIMAL_FORMAT, "PTS" : p9ca.TWO_DECIMAL_FORMAT,
-                     "REB" : p9ca.TWO_DECIMAL_FORMAT, "AST" : p9ca.TWO_DECIMAL_FORMAT,
-                     "STL" : p9ca.TWO_DECIMAL_FORMAT, "BLK" : p9ca.TWO_DECIMAL_FORMAT,
-                     "TOV" : p9ca.TWO_DECIMAL_FORMAT}))
+    st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
     st.write("9Cat Averages Roster Differences")
     st.table(difference_team_9cat_averages.style.applymap(color_negative_red).\
-             format({"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT, "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                     "FG3M" : p9ca.TWO_DECIMAL_FORMAT, "PTS" : p9ca.TWO_DECIMAL_FORMAT,
-                     "REB" : p9ca.TWO_DECIMAL_FORMAT, "AST" : p9ca.TWO_DECIMAL_FORMAT,
-                     "STL" : p9ca.TWO_DECIMAL_FORMAT, "BLK" : p9ca.TWO_DECIMAL_FORMAT,
-                     "TOV" : p9ca.TWO_DECIMAL_FORMAT}))
+             format(STREAMLIT_TABLE_FORMAT))
 
