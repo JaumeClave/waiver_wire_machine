@@ -202,11 +202,13 @@ def player_to_team_mean_stats(team_dictionary, league):
     return team_mean_dataframe
 
 
+@st.cache(show_spinner=False)
 def league_averages(league_team_list):
 
     league_averages_dataframe = pd.DataFrame()
     for team in league_team_list:
-        yahoo_fantasy_api_authentication()
+        sc = yahoo_fantasy_api_authentication()
+        league = yahoo_fantasy_league(sc)
         league_averages_dataframe = league_averages_dataframe.append(player_to_team_mean_stats
                                                                      (team, league))
     league_averages_dataframe.reset_index(drop=True, inplace=True)
@@ -215,6 +217,8 @@ def league_averages(league_team_list):
 
 def yahoo_player_team_and_jersey(player_name):
 
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
     player_details_dictionary = league.player_details(player_name)
     players_team = player_details_dictionary[0][EDITORIAL_TEAM_FULL_NAME]
     players_number = player_details_dictionary[0][UNIFORM_NUMBER]
@@ -268,7 +272,7 @@ def remove_mean_and_player(team_players_9cat_stats_dataframe, player_to_drop):
 
     return team_players_9cat_stats_dataframe
 
-
+@st.cache(show_spinner=False)
 def waiver_add_and_drop(fantasy_team, player_to_drop, player_to_add):
 
     team_players_9cat_stats_dataframe = team_9cat_average_stats(fantasy_team, league)
@@ -334,7 +338,7 @@ def visualise_team_9cat_averages(player_to_drop, player_to_add, current_9cat, ne
 
 
 # Function for the entire process
-@st.cache
+@st.cache(allow_output_mutation=True, show_spinner=False)
 def compare_team_9cats_on_transaction(team, player_to_drop, player_to_add, visualise=True):
 
     current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
@@ -348,6 +352,102 @@ def compare_team_9cats_on_transaction(team, player_to_drop, player_to_add, visua
 
     return current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
            new_team_9cat_averages, difference_team_9cat_averages
+
+
+def new_league_9cat_averages(league_average_dataframe, team, new_team_9cat_averages):
+
+    removed_team_dataframe = league_average_dataframe[~league_average_dataframe[TEAM_COLUMN].str\
+        .contains(team[NAME_KEY])]
+
+    new_team_9cat_averages[TEAM_COLUMN] = team[NAME_KEY]
+    added_team_dataframe = removed_team_dataframe.append(new_team_9cat_averages)
+    added_team_dataframe.reset_index(drop=True, inplace=True)
+
+    return added_team_dataframe
+
+
+def team_dataframe_column_float(roster_dataframe):
+
+    for column in roster_dataframe.columns[1:]:
+        roster_dataframe[column] = roster_dataframe[column].astype(float)
+
+    return roster_dataframe
+
+
+def change_in_power_rankings(league_averages_dataframe, team, player_to_drop, player_to_add):
+
+    current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
+    new_team_9cat_averages = compare_team_9cats_on_transaction(team, player_to_drop,
+                                                           player_to_add, visualise=False)
+
+    # New league average dataframe
+    new_league_averages_dataframe = new_league_9cat_averages(league_averages_dataframe,
+                                                          team, new_team_9cat_averages)
+
+    new_league_averages_dataframe = team_dataframe_column_float(new_league_averages_dataframe)
+
+    # Get new rankings
+    new_league_power_rankings = power_rankings(new_league_averages_dataframe).sort_values(TEAM_COLUMN)
+    # Get current rankings
+    current_league_power_rankings = power_rankings(league_averages_dataframe).sort_values(TEAM_COLUMN)
+
+    # Drop Team column
+    new_league_power_rankings = new_league_power_rankings.reset_index(drop=True)
+    new_league_power_rankings = new_league_power_rankings.drop(TEAM_COLUMN, axis=1)
+    current_league_power_rankings = current_league_power_rankings.reset_index(drop=True)
+    current_league_power_rankings = current_league_power_rankings.drop(TEAM_COLUMN, axis=1)
+
+    # Difference
+    power_rankings_difference = new_league_power_rankings.subtract(current_league_power_rankings)
+
+    # Sorted teams list
+    teams = list(league_averages_dataframe.sort_values(TEAM_COLUMN)[TEAM_COLUMN])
+
+    # Add teams column
+    power_rankings_difference[TEAM_COLUMN] = teams
+
+    # Rearrange columns
+    columns = list(power_rankings_difference.columns)
+    columns = [columns[-1]] + columns[:-1]
+    power_rankings_difference = power_rankings_difference[columns]
+
+    return power_rankings_difference
+
+
+def power_ranking_change(league_averages_dataframe, team, new_team_9cat_averages):
+
+    # New league average dataframe
+    new_league_averages_dataframe = new_league_9cat_averages(league_averages_dataframe,
+                                                          team, new_team_9cat_averages)
+
+    new_league_averages_dataframe = team_dataframe_column_float(new_league_averages_dataframe)
+
+    # Get new rankings
+    new_league_power_rankings = power_rankings(new_league_averages_dataframe).sort_values(TEAM_COLUMN)
+    # Get current rankings
+    current_league_power_rankings = power_rankings(league_averages_dataframe).sort_values(TEAM_COLUMN)
+
+    # Drop Team column
+    new_league_power_rankings = new_league_power_rankings.reset_index(drop=True)
+    new_league_power_rankings = new_league_power_rankings.drop(TEAM_COLUMN, axis=1)
+    current_league_power_rankings = current_league_power_rankings.reset_index(drop=True)
+    current_league_power_rankings = current_league_power_rankings.drop(TEAM_COLUMN, axis=1)
+
+    # Difference
+    power_rankings_difference = new_league_power_rankings.subtract(current_league_power_rankings)
+
+    # Sorted teams list
+    teams = list(league_averages_dataframe.sort_values(TEAM_COLUMN)[TEAM_COLUMN])
+
+    # Add teams column
+    power_rankings_difference[TEAM_COLUMN] = teams
+
+    # Rearrange columns
+    columns = list(power_rankings_difference.columns)
+    columns = [columns[-1]] + columns[:-1]
+    power_rankings_difference = power_rankings_difference[columns]
+
+    return power_rankings_difference
 
 
 # Function power ranking
@@ -410,9 +510,69 @@ def streamlit_return_players_on_team(team_name):
 
     return player_list
 
+@st.cache(show_spinner=False)
+def get_league_free_agents():
+    # Free agents
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
+    free_agent_guards = league.free_agents("G")
+    free_agent_forwards = league.free_agents("F")
+    free_agent_centers = league.free_agents("C")
+
+    free_agents = [player[NAME_KEY] for player in free_agent_guards] \
+                  + [player[NAME_KEY] for player in free_agent_forwards] \
+                  + [player[NAME_KEY] for player in free_agent_centers]
+
+    free_agents = list(set(free_agents))
+    sorted_free_agents = sorted(free_agents)
+
+    return sorted_free_agents
+
+@st.cache(show_spinner=False)
+def get_team_roster(team_dict):
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
+    team_9cat_stats = team_9cat_average_stats(team_dict, league)
+
+    return team_9cat_stats
+
+@st.cache(show_spinner=False, allow_output_mutation=True)
+def streamlit_waiver_add_and_drop(current_9cat_roster_averages, player_to_drop, player_to_add):
+
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
+    team_players_9cat_stats_dataframe = current_9cat_roster_averages
+    current_team_9cat_average_stats = pd.DataFrame(team_players_9cat_stats_dataframe
+                                                   .loc[MEAN_ROW]).T.drop(PLAYER_COLUMN, axis=1)
+
+    removed_mean_dropped_player_dataframe = remove_mean_and_player\
+        (team_players_9cat_stats_dataframe, player_to_drop)
+
+    added_player_9cat_averages = p9ca.get_player_9cat_season_average(player_to_add)
+    new_team_9cat_average_stats_dataframe = removed_mean_dropped_player_dataframe.append\
+        (added_player_9cat_averages)
+    new_team_9cat_average_stats_dataframe.reset_index(inplace=True, drop=True)
+
+    new_team_9cat_average_stats_dataframe = format_roster_dataframe \
+        (new_team_9cat_average_stats_dataframe)
+
+    new_team_9cat_average_stats = pd.DataFrame(new_team_9cat_average_stats_dataframe
+                                                   .loc[MEAN_ROW]).T.drop(PLAYER_COLUMN, axis=1)
+
+    difference_team_9cat_averages = drop_add_mean_9cat_difference(current_team_9cat_average_stats,
+                                              new_team_9cat_average_stats)
+
+    return team_players_9cat_stats_dataframe, current_team_9cat_average_stats, \
+           new_team_9cat_average_stats_dataframe, new_team_9cat_average_stats, \
+           difference_team_9cat_averages
+
 
 # Streamlit Code
 st.title('Free Agent Machine')
+st.subheader("Use this tool to discover how a player add/drop transaction impacts your teams 9cat stats.")
+st.write("Firstly, select your team. Secondly, select the player you want to drop. Thirdly, "
+         "select the FA you want to add. Compare!")
+st.write("")
 
 # Sidebar select Team, Player to Drop and Player to Add
 team = st.sidebar.selectbox(
@@ -422,27 +582,73 @@ team = st.sidebar.selectbox(
       NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY], SWAGGY_P[NAME_KEY],
       TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY], YOBITCH_TOPPIN_ME[NAME_KEY]))
 
-players = streamlit_return_players_on_team(team)
+# Reference variables
+if team == AUTOPICK[NAME_KEY]:
+    team_dict = AUTOPICK
+elif team == CRABBEHERBYTHEPUSSY[NAME_KEY]:
+    team_dict = CRABBEHERBYTHEPUSSY
+elif team == EL_LADRON_DE_CABRAS[NAME_KEY]:
+    team_dict = EL_LADRON_DE_CABRAS
+elif team == LALALAND[NAME_KEY]:
+    team_dict = LALALAND
+elif team == MAGICS_JOHNSON[NAME_KEY]:
+    team_dict = MAGICS_JOHNSON
+elif team == MCCURRY[NAME_KEY]:
+    team_dict = MCCURRY
+elif team == NUNN_OF_YALL_BETTA[NAME_KEY]:
+    team_dict = NUNN_OF_YALL_BETTA
+elif team == RUSTY_CUNTBROOKS[NAME_KEY]:
+    team_dict = RUSTY_CUNTBROOKS
+elif team == SWAGGY_P[NAME_KEY]:
+    team_dict = SWAGGY_P
+elif team == TVONS_TIP_TOP_TEAM[NAME_KEY]:
+    team_dict = TVONS_TIP_TOP_TEAM
+elif team == WAKANDA_FOREVER[NAME_KEY]:
+    team_dict = WAKANDA_FOREVER
+elif team == YOBITCH_TOPPIN_ME[NAME_KEY]:
+    team_dict = YOBITCH_TOPPIN_ME
 
+# Load team dataframe
+with st.spinner(f"Getting {team} Team Information..."):
+    team_9cat_stats = get_team_roster(team_dict)
+
+# Selected Team Players
+players = streamlit_return_players_on_team(team)
 player_to_drop = st.sidebar.selectbox(
      "Player to Drop", players)
-player_to_add = st.sidebar.text_input("Player to Add", "James Harden")
+
+# Free Agents
+free_agents = get_league_free_agents()
+player_to_add = st.sidebar.selectbox("Player to Add", free_agents)
 
 # Compute Transaction
-if st.sidebar.button('Compare!'):
-    sc = yahoo_fantasy_api_authentication()
-    league = yahoo_fantasy_league(sc)
+# if st.sidebar.button('Compare!'):
+with st.spinner(f"Simulating transaction. Dropping {player_to_drop} and adding {player_to_add}..."):
     current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
-        new_team_9cat_averages, difference_team_9cat_averages = compare_team_9cats_on_transaction\
-        (NUNN_OF_YALL_BETTA, player_to_drop, player_to_add, visualise=False)
+        new_team_9cat_averages, difference_team_9cat_averages = streamlit_waiver_add_and_drop(
+        team_9cat_stats, player_to_drop, player_to_add)
 
-    st.write("Current Roster 9Cat Averages")
-    st.table(current_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
+st.write("Current Roster 9Cat Averages")
+st.table(current_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
-    st.write("New Roster 9Cat Averages")
-    st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
+st.write("New Roster 9Cat Averages")
+st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
-    st.write("9Cat Averages Roster Differences")
-    st.table(difference_team_9cat_averages.style.applymap(color_negative_red).\
-             format(STREAMLIT_TABLE_FORMAT))
+st.write("9Cat Averages Roster Differences")
+st.table(difference_team_9cat_averages.style.applymap(color_negative_red).\
+         format(STREAMLIT_TABLE_FORMAT))
+
+# Add line break
+st.write("")
+st.write("The Power Ranking feature will calculate the 9Cat averages of each team in the League. "
+         "This process will take 10-15 minutes the first time you run it. On further attempts to "
+         "run it, the information will be presented instantly.")
+if st.button('Power Rankings'):
+    # Compute league averages
+    with st.spinner(f"Getting the Entire League's Team Information..."):
+        league_averages_dataframe = league_averages(league_team_list)
+    ranking_chnage = power_ranking_change(league_averages_dataframe, team_dict, new_team_9cat_averages)
+    st.table(ranking_chnage)
+
+
 
