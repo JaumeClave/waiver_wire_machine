@@ -72,7 +72,6 @@ requests==2.25.1
 Send2Trash==1.5.0
 six==1.15.0
 smmap==3.0.5
--e git+https://github.com/JaumeClave/waiver_wire_machine.git@cd09cc38888ad3868cc4fc1f29170a7bd4103ffd#egg=src
 streamlit==0.75.0
 terminado==0.9.2
 testpath==0.4.4
