@@ -39,6 +39,7 @@ ASSITS_COLUMN = "AST"
 STEALS_COLUMN = "STL"
 BLOCKS_COLUMN = "BLK"
 TURNOVERS_COLUMN = "TOV"
+POWER_RANK_COLUMN = "Power_Rank"
 
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
@@ -212,7 +213,7 @@ def league_averages(league_team_list):
         league_averages_dataframe = league_averages_dataframe.append(player_to_team_mean_stats
                                                                      (team, league))
     league_averages_dataframe.reset_index(drop=True, inplace=True)
-    league_averages_dataframe.set_index(inplace=True)
+
     return league_averages_dataframe
 
 
@@ -407,7 +408,6 @@ def power_ranking_change(league_averages_dataframe, team, new_team_9cat_averages
     columns = list(power_rankings_difference.columns)
     columns = [columns[-1]] + columns[:-1]
     power_rankings_difference = power_rankings_difference[columns]
-    power_rankings_difference.set_index(TEAM_COLUMN, inplace=True)
 
     return power_rankings_difference
 
@@ -415,14 +415,16 @@ def power_ranking_change(league_averages_dataframe, team, new_team_9cat_averages
 # Function power ranking
 def power_rankings(dataframe):
 
-    power_ranking_dataframe =  dataframe.copy()
+    power_ranking_dataframe = dataframe.copy()
     try:
         power_ranking_dataframe.drop(MEAN_ROW, inplace=True)
     except KeyError:
         pass
     for column in power_ranking_dataframe.columns[1:]:
-
-        sorted_points = power_ranking_dataframe[column].sort_values(ascending=False)
+        if column != "TOV":
+            sorted_points = power_ranking_dataframe[column].sort_values(ascending=False)
+        else:
+            sorted_points = power_ranking_dataframe[column].sort_values(ascending=True)
         sorted_points.drop_duplicates(inplace=True)
 
         sorting_dictionary = dict()
@@ -432,7 +434,7 @@ def power_rankings(dataframe):
             sorting_dictionary[point] = count
             count += 1
 
-        power_ranking_dataframe[column] = power_ranking_dataframe[column].map\
+        power_ranking_dataframe[" " + column] = power_ranking_dataframe[column].map\
             (sorting_dictionary)
 
     power_ranking_dataframe.drop(dataframe.columns[1:], axis=1, inplace=True)
@@ -446,7 +448,26 @@ def color_negative_red(val):
     the css property `'color: red'` for negative
     strings, black otherwise.
     """
-    color = '#EC7063' if val < 0 else '#52BE80'
+    if val == 0:
+        color = "#000000"
+    elif val < 0:
+        color = "#EC7063"
+    else:
+        color = '#52BE80'
+    return 'color: %s' % color
+
+def color_negative_red_tov(val):
+    """
+    Takes a scalar and returns a string with
+    the css property `'color: red'` for negative
+    strings, black otherwise.
+    """
+    if val == 0:
+        color = "#000000"
+    elif val > 0:
+        color = "#EC7063"
+    else:
+        color = '#52BE80'
     return 'color: %s' % color
 
 
@@ -530,6 +551,38 @@ def streamlit_waiver_add_and_drop(current_9cat_roster_averages, player_to_drop, 
            difference_team_9cat_averages
 
 
+def get_overall_power_rank(power_ranking_dataframe):
+
+    power_ranking_dataframe = power_ranking_dataframe.set_index(TEAM_COLUMN)
+    power_ranking_dataframe["PR"] = 109 - power_ranking_dataframe.sum(axis=1,
+                                                                              numeric_only=True)
+    columns = list(power_ranking_dataframe.columns)
+    columns = [columns[-1]] + columns[:-1]
+    power_ranking_dataframe = power_ranking_dataframe[columns]
+    power_ranking_dataframe = power_ranking_dataframe.sort_values("PR",
+                                                                  ascending=False)
+
+    return power_ranking_dataframe
+
+
+# Wide mode
+def _max_width_():
+    max_width_str = f"max-width: 1000px;"
+    st.markdown(
+        f"""
+    <style>
+    .reportview-container .main .block-container{{
+        {max_width_str}
+    }}
+    </style>    
+    """,
+        unsafe_allow_html=True,
+    )
+
+# Force load in wide mode
+_max_width_()
+
+
 # Streamlit Code
 st.subheader('Free Agent Machine')
 st.write("This feature simulates a FA transaction and calculates your teams 9Cat averages "
@@ -537,7 +590,7 @@ st.write("This feature simulates a FA transaction and calculates your teams 9Cat
          " impacts your teams average 9Cat stats. This process will take ~1 minute to run "
          "initially as it loads and calculates your entire teams 9cat stats. After its initial "
          "loading, select a player to drop and a player to add, the transaction information will be"
-         " presented instantly.")
+         " presented quickly.")
 # st.write("Firstly, select your team. Secondly, select the player you want to drop. Thirdly, "
 #          "select the FA you want to add. Compare!")
 st.write("")
@@ -625,7 +678,10 @@ st.write("New Roster 9Cat Averages")
 st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
 st.write("9Cat Averages Roster Differences")
-st.table(difference_team_9cat_averages.style.applymap(color_negative_red).\
+st.table(difference_team_9cat_averages.style.applymap(
+    color_negative_red,subset=pd.IndexSlice[:,["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL",
+                                               "BLK"]]).applymap(
+    color_negative_red_tov, subset=pd.IndexSlice[:,["TOV"]]).
          format(STREAMLIT_TABLE_FORMAT))
 
 # Add line break
@@ -634,16 +690,23 @@ st.subheader("Team Power Rankings")
 st.write("The Power Ranking feature will calculate the 9Cat averages of each team in the League. "
          "Use this tool to see how your team ranks against other League teams in each of "
          "the 9 categories. This process will take 10-15 minutes the first time you run it. "
-         "On further attempts to run it, the information will be presented instantly.")
+         "On further attempts to run it, the information will be presented quickly.")
 st.write("")
 if st.button('Power Rankings'):
     # Compute league averages
     with st.spinner(f"Getting the entire league's team information. This may take a while..."):
         league_averages_dataframe = league_averages(league_team_list)
-    st.table(league_averages_dataframe)
-    ranking_change = power_ranking_change(league_averages_dataframe, team_dict,
-                                          new_team_9cat_averages)
-    st.dataframe(ranking_change)
+        league_averages_dataframe_index = league_averages_dataframe.set_index(TEAM_COLUMN)
+        league_power_rankings = power_rankings(league_averages_dataframe)
+        league_power_rankings_index = get_overall_power_rank(league_power_rankings)
+
+    st.table(league_averages_dataframe_index)
+
+    st.table(league_power_rankings_index)
+
+    # ranking_change = power_ranking_change(league_averages_dataframe, team_dict,
+    #                                       new_team_9cat_averages)
+    # st.dataframe(ranking_change)
 
 
 
