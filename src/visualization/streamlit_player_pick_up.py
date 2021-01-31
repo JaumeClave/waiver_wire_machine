@@ -5,11 +5,11 @@ from src.data import player_9cat_average as p9ca
 from nba_api.stats.endpoints import commonallplayers
 from nba_api.stats.endpoints import commonplayerinfo
 import streamlit as st
+import json
 
-
+JSON_FOLDER = r"C:\Users\Jaume\Documents\Python Projects\waiver_wire_machine\references\oauth2.json"
 NBA = "nba"
 SEASON = 2020
-JSON_FOLDER = r"C:\Users\Jaume\Documents\Python Projects\waiver_wire_machine\references\oauth2.json"
 NAME_KEY = "name"
 GAMES_COLUMN = "GAMES"
 MEAN_ROW = "mean"

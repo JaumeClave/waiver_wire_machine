@@ -15,7 +15,7 @@ import streamlit as st
 
 NBA = "nba"
 SEASON = 2020
-JSON_FOLDER = r"C:\Users\Jaume\Documents\Python Projects\waiver_wire_machine\references\oauth2.json"
+JSON_FOLDER = "../references/oauth2.json"
 NAME_KEY = "name"
 GAMES_COLUMN = "GAMES"
 MEAN_ROW = "mean"
