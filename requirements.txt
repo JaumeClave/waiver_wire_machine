@@ -1,3 +1,5 @@
+yahoo-fantasy-api==2.4.1
+yahoo-oauth==1.1
 altair==4.1.0
 argon2-cffi==20.1.0
 astor==0.8.1
