@@ -108,7 +108,7 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
 
 def yahoo_fantasy_api_authentication():
 
-    sc = OAuth2(None, None, from_file=filename)
+    sc = OAuth2(None, None, from_file=uploaded_file)
 
     return sc
 
@@ -813,6 +813,24 @@ def _max_width_():
 _max_width_()
 
 uploaded_file = st.file_uploader("Choose a file")
+def yahoo_fantasy_api_authentication():
+
+    sc = OAuth2(None, None, from_file=uploaded_file)
+
+    return sc
+
+
+def yahoo_fantasy_league(sc):
+
+    gm = yfa.Game(sc, NBA)
+    league_id_list = gm.league_ids(year=SEASON)
+    league_id = "".join(str(id) for id in league_id_list)
+    league = gm.to_league(league_id)
+
+    return league
+
+sc = yahoo_fantasy_api_authentication()
+l = yahoo_fantasy_league(sc)
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
