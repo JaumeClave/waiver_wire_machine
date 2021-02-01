@@ -808,7 +808,7 @@ def _max_width_():
     """,
         unsafe_allow_html=True,
     )
-
+import os
 # Force load in wide mode
 _max_width_()
 
