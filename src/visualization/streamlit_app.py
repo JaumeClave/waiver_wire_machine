@@ -812,33 +812,16 @@ def _max_width_():
 # Force load in wide mode
 _max_width_()
 
-def st_file_selector(st_placeholder, path='.', label='Please, select a file/folder...'):
-    # get base path (directory)
-    base_path = '.' if path is None or path is '' else path
-    base_path = base_path if os.path.isdir(
-        base_path) else os.path.dirname(base_path)
-    base_path = '.' if base_path is None or base_path is '' else base_path
-    # list files in base path directory
-    files = os.listdir(base_path)
-    if base_path is not '.':
-        files.insert(0, '..')
-    files.insert(0, '.')
-    selected_file = st_placeholder.selectbox(
-        label=label, options=files, key=base_path)
-    selected_path = os.path.normpath(os.path.join(base_path, selected_file))
-    if selected_file is '.':
-        return selected_path
-    if os.path.isdir(selected_path):
-        selected_path = st_file_selector(st_placeholder=st_placeholder,
-                                         path=selected_path, label=label)
-    return selected_path
+def save_uploaded_file(uploadedfile):
+  with open(os.path.join("tempDir",uploadedfile.name),"wb") as f:
+     f.write(uploadedfile.getbuffer())
+  return st.success("Saved file :{} in tempDir".format(uploadedfile.name))
 
-st_session_state = get(input_path='.')
-st_session_state.input_path = st_file_selector(st_placeholder=st.empty(), path=st_session_state.input_path, label=f'Input path')
-st.text(f'> Selected \'{st_session_state.input_path}\'.')
 
-sc = yahoo_fantasy_api_authentication()
-l = yahoo_fantasy_league(sc)
+uploaded_file = st.file_uploader('FILE UPLOAD')
+
+save_uploaded_file(uploaded_file)
+
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
