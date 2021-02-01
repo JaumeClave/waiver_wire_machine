@@ -832,7 +832,7 @@ def _max_width_():
 _max_width_()
 
 sc = yahoo_fantasy_api_authentication()
-
+league = yahoo_fantasy_league(sc)
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
