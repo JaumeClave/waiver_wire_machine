@@ -105,14 +105,6 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
                     NUNN_OF_YALL_BETTA, RUSTY_CUNTBROOKS, WAKANDA_FOREVER, SWAGGY_P,
                     YOBITCH_TOPPIN_ME, TVONS_TIP_TOP_TEAM, EL_LADRON_DE_CABRAS]
 
-import os
-
-filename = st.text_input('Enter a file path:')
-try:
-    with open(filename) as input:
-        st.text(input.read())
-except FileNotFoundError:
-    st.error('File not found.')
 
 def yahoo_fantasy_api_authentication():
 
@@ -820,13 +812,7 @@ def _max_width_():
 # Force load in wide mode
 _max_width_()
 
-def file_selector(folder_path='.'):
-    filenames = os.listdir(folder_path)
-    selected_filename = st.selectbox('Select a file', filenames)
-    return os.path.join(folder_path, selected_filename)
-
-filename = file_selector()
-st.write('You selected `%s`' % filename)
+uploaded_file = st.file_uploader("Choose a file")
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
