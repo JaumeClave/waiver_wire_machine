@@ -1,7 +1,6 @@
 import pandas as pd
 from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
-from src.data import player_9cat_average as p9ca
 from nba_api.stats.endpoints import commonallplayers
 from nba_api.stats.endpoints import commonplayerinfo
 import streamlit as st
@@ -40,16 +39,55 @@ STEALS_COLUMN = "STL"
 BLOCKS_COLUMN = "BLK"
 TURNOVERS_COLUMN = "TOV"
 POWER_RANK_COLUMN = "Power_Rank"
+IS_ACTIVE_KEY = "is_active"
+FULL_NAME_KEY = "full_name"
+PERSON_ID_KEY = "PERSON_ID"
+SEASON_2020 = "2020"
+MINUTES_COLUMN = "MIN"
+FIELD_GOALS_MADE_COLUMN = "FGM"
+FIELD_GOAL_ATTEMPTED_COLUMN = "FGA"
+FIELD_GOAL_PERCENTAGE_COLUMN = "FG_PCT"
+FREE_THROW_MADE_COLUMN = "FTM"
+FREE_THROW_ATTEMPTED_COLUMN = "FTA"
+FREE_THROW_PERCENTAGE_COLUMN = "FT_PCT"
+THREES_MADE_COLUMN = "FG3M"
+POINTS_COLUMN = "PTS"
+REBOUNDS_COLUMN = "REB"
+ASSITS_COLUMN = "AST"
+STEALS_COLUMN = "STL"
+BLOCKS_COLUMN = "BLK"
+TURNOVERS_COLUMN = "TOV"
+MEAN_ROW = "Mean"
+PLAYER_COLUMN = "PLAYER"
+GAMES_PLAYED = "GAMES"
+DISPLAY_FIRST_LAST = "DISPLAY_FIRST_LAST"
+COMMON_ALL_PLAYERS ="CommonAllPlayers"
+
+
+THREE_DECIMAL_FORMAT = "{:,.3f}".format
+TWO_DECIMAL_FORMAT = "{:,.2f}".format
+
+CALCULATING_COLUMNS = [FIELD_GOALS_MADE_COLUMN, FIELD_GOAL_ATTEMPTED_COLUMN,
+                    FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_MADE_COLUMN,
+                    FREE_THROW_ATTEMPTED_COLUMN, FREE_THROW_PERCENTAGE_COLUMN,
+                    THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
+                    STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
+NINE_CAT_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN,
+                    THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
+                    STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
+THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
+ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
+                       STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
 
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
                        STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
 
-STREAMLIT_TABLE_FORMAT = {"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                          "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT, "FG3M" : p9ca.TWO_DECIMAL_FORMAT,
-                          "PTS" : p9ca.TWO_DECIMAL_FORMAT, "REB" : p9ca.TWO_DECIMAL_FORMAT,
-                          "AST" : p9ca.TWO_DECIMAL_FORMAT, "STL" : p9ca.TWO_DECIMAL_FORMAT,
-                          "BLK" : p9ca.TWO_DECIMAL_FORMAT, "TOV" : p9ca.TWO_DECIMAL_FORMAT}
+STREAMLIT_TABLE_FORMAT = {"FG_PCT" :THREE_DECIMAL_FORMAT,
+                          "FT_PCT" : THREE_DECIMAL_FORMAT, "FG3M" : TWO_DECIMAL_FORMAT,
+                          "PTS" : TWO_DECIMAL_FORMAT, "REB" : TWO_DECIMAL_FORMAT,
+                          "AST" : TWO_DECIMAL_FORMAT, "STL" : TWO_DECIMAL_FORMAT,
+                          "BLK" : TWO_DECIMAL_FORMAT, "TOV" : TWO_DECIMAL_FORMAT}
 
 # Team dictionaries
 LALALAND = {'team_key': '402.l.55374.t.1', 'name': 'LaLaLand'}
@@ -69,6 +107,7 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
                     YOBITCH_TOPPIN_ME, TVONS_TIP_TOP_TEAM, EL_LADRON_DE_CABRAS]
 
 
+
 def get_sauce():
 
     sauce = "https://1drv.ws/x/s!AtOj1gsstwd4lWVsADS9MjOAFxwC?e=sVH6Nm"
@@ -76,7 +115,7 @@ def get_sauce():
     sauce_dict = dict(zip(sauce_df[0], sauce_df[1]))
 
     return sauce_dict
-#JSON
+
 
 import json
 dicta = get_sauce()
@@ -101,6 +140,95 @@ def yahoo_fantasy_league(sc):
     league = gm.to_league(league_id)
 
     return league
+
+
+def nba_active_players():
+
+    common_all_players = commonallplayers.CommonAllPlayers(is_only_current_season=1)
+    common_all_players_dict = common_all_players.get_normalized_dict()[COMMON_ALL_PLAYERS]
+
+    return common_all_players_dict
+
+
+def move_column_inplace(dataframe, column, position):
+
+    column = dataframe.pop(column)
+    dataframe.insert(position, column.name, column)
+
+
+def true_percentage(dataframe, pct_category):
+    no_mean_row_dataframe = dataframe.drop(MEAN_ROW)
+    if pct_category == FIELD_GOAL_PERCENTAGE_COLUMN:
+        true_field_goal_pct = no_mean_row_dataframe[FIELD_GOALS_MADE_COLUMN].mean() / \
+                              no_mean_row_dataframe[FIELD_GOAL_ATTEMPTED_COLUMN].mean()
+        dataframe.at[MEAN_ROW, FIELD_GOAL_PERCENTAGE_COLUMN] = true_field_goal_pct
+
+    else:
+        true_free_throw_pct = no_mean_row_dataframe[FREE_THROW_MADE_COLUMN].mean() / \
+            no_mean_row_dataframe[FREE_THROW_ATTEMPTED_COLUMN].mean()
+        dataframe.at[MEAN_ROW, FREE_THROW_PERCENTAGE_COLUMN] = true_free_throw_pct
+
+    return dataframe
+
+
+def format_dataframe_decimals(dataframe):
+    dataframe[THREE_DECIMAL_COLUMNS] = dataframe[THREE_DECIMAL_COLUMNS].applymap \
+        (THREE_DECIMAL_FORMAT)
+    dataframe[ONE_DECIMAL_COLUMNS] = dataframe[ONE_DECIMAL_COLUMNS].applymap(TWO_DECIMAL_FORMAT)
+
+    return dataframe
+
+def player_average_9cat_stats(player_name, player_data_dict):
+
+    # Get player identifier
+    player_name_dict = [player for player in player_data_dict if player[DISPLAY_FIRST_LAST] ==
+                        player_name]
+    player_id = player_name_dict[0][PERSON_ID_KEY]
+
+    # Player game log
+    player_game_log = playergamelog.PlayerGameLog(player_id=player_id, season=SEASON_2020)
+    nba_cooldown = random.gammavariate(alpha=9, beta=0.4)
+    time.sleep(nba_cooldown)
+    player_game_log_dataframe = player_game_log.get_data_frames()[0]
+
+    # Filter for games played
+    player_game_log_dataframe = \
+    player_game_log_dataframe[player_game_log_dataframe[MINUTES_COLUMN] >= 1]
+
+    # Find true percentages
+    player_game_log_dataframe = player_game_log_dataframe[CALCULATING_COLUMNS]
+    player_game_log_dataframe.loc[MEAN_ROW] = player_game_log_dataframe.mean()
+    player_game_log_dataframe = true_percentage(player_game_log_dataframe,
+                                                FIELD_GOAL_PERCENTAGE_COLUMN)
+    player_game_log_dataframe = true_percentage(player_game_log_dataframe,
+                                                FREE_THROW_PERCENTAGE_COLUMN)
+
+    # Filter for 9cat columns
+    player_9cat = player_game_log_dataframe[NINE_CAT_COLUMNS]
+
+    # Formatting columns
+    player_9cat = format_dataframe_decimals(player_9cat)
+
+    # Show only averages
+    player_9cat_season_average = pd.DataFrame(player_9cat.loc[MEAN_ROW]).T
+
+    # Add player name/games player
+    player_9cat_season_average[PLAYER_COLUMN] = player_name
+    player_9cat_season_average[GAMES_PLAYED] = len(player_game_log_dataframe)
+
+    # Move PLAYER NAME column
+    move_column_inplace(player_9cat_season_average, PLAYER_COLUMN, 0)
+
+    return player_9cat_season_average
+
+
+
+def get_player_9cat_season_average(player_name):
+
+    active_player_dict = nba_active_players()
+    player_9cat_season_average = player_average_9cat_stats(player_name, active_player_dict)
+
+    return player_9cat_season_average
 
 
 def yahoo_player_team_and_jersey(player_name):
@@ -150,15 +278,15 @@ def yahoo_name_to_nba_name(yahoo_player_name):
 
 def create_roster_dataframe(player_list):
 
-    active_players = p9ca.nba_active_players()
+    active_players = nba_active_players()
     roster_dataframe = pd.DataFrame()
     for player in player_list:
         try:
-            roster_dataframe = roster_dataframe.append(p9ca.player_average_9cat_stats(player,
+            roster_dataframe = roster_dataframe.append(player_average_9cat_stats(player,
                                                                                       active_players))
         except IndexError:
             nba_player_name = yahoo_name_to_nba_name(player)
-            roster_dataframe = roster_dataframe.append(p9ca.player_average_9cat_stats(nba_player_name,
+            roster_dataframe = roster_dataframe.append(player_average_9cat_stats(nba_player_name,
                                                                                       active_players))
         except:
             print(f"Can't find player {player}")
@@ -174,7 +302,7 @@ def format_roster_dataframe(roster_dataframe):
         roster_dataframe[column] = roster_dataframe[column].astype(float)
 
     roster_dataframe.loc[MEAN_ROW] = roster_dataframe.mean()
-    roster_dataframe = p9ca.format_dataframe_decimals(roster_dataframe)
+    roster_dataframe = format_dataframe_decimals(roster_dataframe)
     try:
         roster_dataframe.drop(GAMES_COLUMN, axis=1, inplace=True)
     except:
@@ -301,7 +429,7 @@ def waiver_add_and_drop(fantasy_team, player_to_drop, player_to_add):
     removed_mean_dropped_player_dataframe = remove_mean_and_player\
         (team_players_9cat_stats_dataframe, player_to_drop)
 
-    added_player_9cat_averages = p9ca.get_player_9cat_season_average(player_to_add)
+    added_player_9cat_averages = get_player_9cat_season_average(player_to_add)
     new_team_9cat_average_stats_dataframe = removed_mean_dropped_player_dataframe.append\
         (added_player_9cat_averages)
     new_team_9cat_average_stats_dataframe.reset_index(inplace=True, drop=True)
@@ -570,7 +698,7 @@ def streamlit_waiver_add_and_drop(current_9cat_roster_averages, player_to_drop, 
     removed_mean_dropped_player_dataframe = remove_mean_and_player\
         (team_players_9cat_stats_dataframe, player_to_drop)
 
-    added_player_9cat_averages = p9ca.get_player_9cat_season_average(player_to_add)
+    added_player_9cat_averages = get_player_9cat_season_average(player_to_add)
     new_team_9cat_average_stats_dataframe = removed_mean_dropped_player_dataframe.append\
         (added_player_9cat_averages)
     new_team_9cat_average_stats_dataframe.reset_index(inplace=True, drop=True)
