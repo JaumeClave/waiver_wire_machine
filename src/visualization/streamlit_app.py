@@ -109,8 +109,7 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
 
 def yahoo_fantasy_api_authentication():
 
-    sc = OAuth2(None, None, from_file="https://raw.githubusercontent.com/JaumeClave\
-                                               /waiver_wire_machine/master/references/yobitchtoppinme.json")
+    sc = OAuth2(None, None, from_file="https://github.com/JaumeClave/waiver_wire_machine/blob/master/references/yobitchtoppinme.json")
 
     return sc
 
