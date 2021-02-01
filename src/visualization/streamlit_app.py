@@ -105,11 +105,18 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
                     NUNN_OF_YALL_BETTA, RUSTY_CUNTBROOKS, WAKANDA_FOREVER, SWAGGY_P,
                     YOBITCH_TOPPIN_ME, TVONS_TIP_TOP_TEAM, EL_LADRON_DE_CABRAS]
 
+import os
 
+filename = st.text_input('Enter a file path:')
+try:
+    with open(filename) as input:
+        st.text(input.read())
+except FileNotFoundError:
+    st.error('File not found.')
 
 def yahoo_fantasy_api_authentication():
 
-    sc = OAuth2(None, None, from_file="https://github.com/JaumeClave/waiver_wire_machine/blob/master/references/yobitchtoppinme.json")
+    sc = OAuth2(None, None, from_file=filename)
 
     return sc
 
