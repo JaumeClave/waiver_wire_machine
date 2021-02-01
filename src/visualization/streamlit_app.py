@@ -6,7 +6,6 @@ from nba_api.stats.endpoints import commonplayerinfo
 import streamlit as st
 import json
 
-JSON_FOLDER = r"C:\Users\Jaume\Documents\Python Projects\waiver_wire_machine\references\oauth2.json"
 NBA = "nba"
 SEASON = 2020
 NAME_KEY = "name"
@@ -108,26 +107,10 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
 
 
 
-def get_sauce():
-
-    sauce = "https://1drv.ws/x/s!AtOj1gsstwd4lWVsADS9MjOAFxwC?e=sVH6Nm"
-    sauce_df = pd.read_csv(sauce, header=None)
-    sauce_dict = dict(zip(sauce_df[0], sauce_df[1]))
-
-    return sauce_dict
-
-
-import json
-dicta = get_sauce()
-
-json_object = json.dumps(dicta)
-loaded_r = json.loads(json_object)
-
-
 def yahoo_fantasy_api_authentication():
 
-    sc = OAuth2(consumer_key=loaded_r["consumer_key"],
-                consumer_secret=loaded_r["consumer_secret"])
+    sc = OAuth2(None, None, from_file="https://raw.githubusercontent.com/JaumeClave\
+                                               /waiver_wire_machine/master/references/yobitchtoppinme.json")
 
     return sc
 
