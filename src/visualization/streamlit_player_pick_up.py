@@ -655,7 +655,6 @@ def get_average_and_power_ranking_change(league_averages_dataframe, team_dict,
                                          new_team_9cat_averages):
 
     new_league_averages_dataframe, new_league_power_rankings, power_rankings_difference = power_ranking_change(league_averages_dataframe, team_dict, new_team_9cat_averages)
-    print(new_league_power_rankings.columns)
 
     new_league_averages_dataframe = new_league_averages_dataframe.reset_index(drop=True)
     unformatted_overall_power_rankings = columns_to_string(new_league_averages_dataframe,
