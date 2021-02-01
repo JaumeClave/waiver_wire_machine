@@ -703,6 +703,8 @@ def _max_width_():
 # Force load in wide mode
 _max_width_()
 
+sc = yahoo_fantasy_api_authentication()
+
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
