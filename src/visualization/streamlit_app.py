@@ -4,6 +4,13 @@ import yahoo_fantasy_api as yfa
 from nba_api.stats.endpoints import commonallplayers
 from nba_api.stats.endpoints import commonplayerinfo
 import streamlit as st
+import time
+import random
+import pandas as pd
+pd.options.mode.chained_assignment = None
+from nba_api.stats.static import players
+from nba_api.stats.endpoints import playergamelog
+from nba_api.stats.endpoints import commonallplayers
 import json
 
 NBA = "nba"
