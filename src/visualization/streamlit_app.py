@@ -126,7 +126,8 @@ def yahoo_fantasy_league(sc):
 
     return league
 
-@retry
+@retry(wait_exponential_multiplier=1000,
+wait_exponential_max=10000)
 def nba_active_players():
 
     common_all_players = commonallplayers.CommonAllPlayers(is_only_current_season=1)
