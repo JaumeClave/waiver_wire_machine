@@ -9,6 +9,7 @@ pd.options.mode.chained_assignment = None
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playergamelog
 from nba_api.stats.endpoints import commonallplayers
+from retrying import retry
 
 NBA = "nba"
 SEASON = 2020
@@ -125,7 +126,7 @@ def yahoo_fantasy_league(sc):
 
     return league
 
-
+@retry
 def nba_active_players():
 
     common_all_players = commonallplayers.CommonAllPlayers(is_only_current_season=1)
