@@ -1,7 +1,5 @@
-import pandas as pd
 from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
-from nba_api.stats.endpoints import commonallplayers
 from nba_api.stats.endpoints import commonplayerinfo
 import streamlit as st
 import time
@@ -11,7 +9,6 @@ pd.options.mode.chained_assignment = None
 from nba_api.stats.static import players
 from nba_api.stats.endpoints import playergamelog
 from nba_api.stats.endpoints import commonallplayers
-import json
 
 NBA = "nba"
 SEASON = 2020
