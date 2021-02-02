@@ -108,10 +108,9 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
 
 def yahoo_fantasy_api_authentication():
 
-    sc = OAuth2(None, None, from_file=uploaded_file)
+    sc = OAuth2(None, None, from_file=a)
 
     return sc
-
 
 def yahoo_fantasy_league(sc):
 
@@ -813,15 +812,16 @@ import os
 _max_width_()
 
 def save_uploaded_file(uploadedfile):
-  with open(os.path.join("tempDir",uploadedfile.name),"wb") as f:
-     f.write(uploadedfile.getbuffer())
-  return st.success("Saved file :{} in tempDir".format(uploadedfile.name))
+    with open(os.path.join(uploadedfile.name),"wb") as f:
+        f.write(uploadedfile.getbuffer())
+    return os.path.realpath(uploadedfile.name)
+
 
 
 uploaded_file = st.file_uploader('FILE UPLOAD')
 
-save_uploaded_file(uploaded_file)
-
+a = save_uploaded_file(uploaded_file)
+st.write(a)
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
