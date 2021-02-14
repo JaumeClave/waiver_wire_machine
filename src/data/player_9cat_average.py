@@ -154,3 +154,4 @@ if __name__ == "__main__":
     ARGS = CLI.parse_args()
     for player in ARGS.players:
         print(get_player_9cat_season_average(player))
+

@@ -1057,7 +1057,7 @@ def weekly_matchup_evaluator(team1_dict, team2_dict, team1_9cat_average_stats_da
 
 # Wide mode
 def _max_width_():
-    max_width_str = f"max-width: 1000px;"
+    max_width_str = f"max-width: 1350px;"
     st.markdown(
         f"""
     <style>
