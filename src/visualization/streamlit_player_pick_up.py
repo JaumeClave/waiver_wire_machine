@@ -217,10 +217,8 @@ def player_to_team_mean_stats(team_dictionary, league):
     Fantasy Team. It then finds the average stats for the entire team and returns a single row
     dataframe with the Fantasy Team name and its seasoned averaged 9cat stats.
     """
-
     roster_dataframe = team_9cat_average_stats(team_dictionary, league)
     team_mean_dataframe = fantasy_team_mean_stats(roster_dataframe, team_dictionary)
-
     return team_mean_dataframe
 
 
@@ -272,7 +270,8 @@ def nba_player_name_from_jersey_search(team_player_ids, yahoo_jersey_number):
 
 
 def yahoo_name_to_nba_name(yahoo_player_name):
-    """ Function expectes a Yahoo player name and it will find the players Team Name and Jersey
+    """
+    Function expects a Yahoo player name and it will find the players Team Name and Jersey
     Number. It then searches the NBA API for Player IDs belonging to found Team Name. For every
     Player ID it searches their Jersey Number. When there is a match, it returns the NBA Player
     Name.
