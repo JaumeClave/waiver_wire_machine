@@ -1,16 +1,18 @@
+import json
+import requests
 import pandas as pd
+import streamlit as st
 from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
 from src.data import player_9cat_average as p9ca
 from nba_api.stats.endpoints import commonallplayers
 from nba_api.stats.endpoints import commonplayerinfo
-import streamlit as st
-import json
+from src.data import all_functions as af
+
 
 JSON_FOLDER = r"C:\Users\Jaume\Documents\Python Projects\waiver_wire_machine\references\oauth2.json"
 NBA = "nba"
 SEASON = 2020
-NAME_KEY = "name"
 GAMES_COLUMN = "GAMES"
 MEAN_ROW = "mean"
 TEAM_KEY = "team_key"
@@ -18,14 +20,14 @@ PLAYER_COLUMN = "PLAYER"
 TEAM_COLUMN = "TEAM"
 EDITORIAL_TEAM_FULL_NAME = "editorial_team_full_name"
 UNIFORM_NUMBER = "uniform_number"
-COMMON_ALL_PLAYERS ="CommonAllPlayers"
+COMMON_ALL_PLAYERS = "CommonAllPlayers"
 PERSON_ID_KEY = "PERSON_ID"
 TEAM_CITY_KEY = "TEAM_CITY"
 TEAM_NAME_KEY = "TEAM_NAME"
 COMMON_PLAYER_INFO = "CommonPlayerInfo"
 JERSEY_KEY = "JERSEY"
 DISPLAY_FIRST_LAST = "DISPLAY_FIRST_LAST"
-RANK_SUFFIX ="_RANK"
+RANK_SUFFIX = "_RANK"
 FIELD_GOALS_MADE_COLUMN = "FGM"
 FIELD_GOAL_ATTEMPTED_COLUMN = "FGA"
 FIELD_GOAL_PERCENTAGE_COLUMN = "FG_PCT"
@@ -40,18 +42,46 @@ STEALS_COLUMN = "STL"
 BLOCKS_COLUMN = "BLK"
 TURNOVERS_COLUMN = "TOV"
 POWER_RANK_COLUMN = "Power_Rank"
-
+PR_COLUMN = "PR"
+PLAYER_ID_KEY = "player_id"
+NAME_KEY = "name"
+LSCD_KEY = "lscd"
+MSCD_KEY = "mscd"
+G_KEY = "g"
+GID_KEY = "gid"
+GAME_ID_KEY = "game_id"
+GDATE_KEY = "gdte"
+GAME_DATE_KEY = "game_date"
+V_KEY = "v"
+TID_KEY = "tid"
+VISITORS_TEAM_ID_KEY = "visitors_tid"
+VISITORS_KEY = "visitors"
+TC_KEY = "tc"
+TN_KEY = "tn"
+H_KEY = "h"
+HOME_TEAM_ID_KEY = "home_tid"
+HOME_KEY = "home"
+TOTAL_ROW = "total"
+INDEX_COLUMN = "index"
+NBA_NAME_LA_CLIPPERS = "LA Clippers"
+YAHOO_NAME_LA_CLIPPERS = "Los Angeles Clippers"
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
                        STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
-
-STREAMLIT_TABLE_FORMAT = {"FG_PCT" : p9ca.THREE_DECIMAL_FORMAT,
-                          "FT_PCT" : p9ca.THREE_DECIMAL_FORMAT, "FG3M" : p9ca.TWO_DECIMAL_FORMAT,
-                          "PTS" : p9ca.TWO_DECIMAL_FORMAT, "REB" : p9ca.TWO_DECIMAL_FORMAT,
-                          "AST" : p9ca.TWO_DECIMAL_FORMAT, "STL" : p9ca.TWO_DECIMAL_FORMAT,
-                          "BLK" : p9ca.TWO_DECIMAL_FORMAT, "TOV" : p9ca.TWO_DECIMAL_FORMAT}
-
-# Team dictionaries
+STREAMLIT_TABLE_FORMAT = {"FG_PCT": p9ca.THREE_DECIMAL_FORMAT, "FT_PCT": p9ca.THREE_DECIMAL_FORMAT,
+                          "FG3M": p9ca.TWO_DECIMAL_FORMAT, "PTS": p9ca.TWO_DECIMAL_FORMAT,
+                          "REB": p9ca.TWO_DECIMAL_FORMAT, "AST": p9ca.TWO_DECIMAL_FORMAT,
+                          "STL": p9ca.TWO_DECIMAL_FORMAT, "BLK": p9ca.TWO_DECIMAL_FORMAT,
+                          "TOV": p9ca.TWO_DECIMAL_FORMAT}
+COLUMN_9CAT_DECIMAL_FORMAT = {af.FIELD_GOAL_PERCENTAGE_COLUMN: af.THREE_DECIMAL_FORMAT,
+                              af.FREE_THROW_PERCENTAGE_COLUMN: af.THREE_DECIMAL_FORMAT,
+                              af.THREES_MADE_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.POINTS_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.REBOUNDS_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.ASSITS_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.STEALS_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.BLOCKS_COLUMN: af.TWO_DECIMAL_FORMAT,
+                              af.TURNOVERS_COLUMN: af.TWO_DECIMAL_FORMAT}
 LALALAND = {'team_key': '402.l.55374.t.1', 'name': 'LaLaLand'}
 AUTOPICK = {'team_key': '402.l.55374.t.2', 'name': 'Autopick'}
 CRABBEHERBYTHEPUSSY = {'team_key': '402.l.55374.t.3', 'name': 'CrabbeHerByThePussy'}
@@ -68,7 +98,6 @@ league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCC
                     NUNN_OF_YALL_BETTA, RUSTY_CUNTBROOKS, WAKANDA_FOREVER, SWAGGY_P,
                     YOBITCH_TOPPIN_ME, TVONS_TIP_TOP_TEAM, EL_LADRON_DE_CABRAS]
 
-
 def yahoo_fantasy_api_authentication():
     """
     Function authenticates to Yahoo Fantasy API via keys in a file.
@@ -76,7 +105,6 @@ def yahoo_fantasy_api_authentication():
     """
     sc = OAuth2(None, None, from_file=JSON_FOLDER)
     return sc
-
 
 def yahoo_fantasy_league(sc):
     """
@@ -89,7 +117,6 @@ def yahoo_fantasy_league(sc):
     league_id = "".join(str(id) for id in league_id_list)
     league = gm.to_league(league_id)
     return league
-
 
 def yahoo_player_team_and_jersey(player_name):
     """
@@ -105,7 +132,6 @@ def yahoo_player_team_and_jersey(player_name):
     players_number = player_details_dictionary[0][UNIFORM_NUMBER]
     return players_team, players_number
 
-
 def player_ids_by_nba_team_name(nba_team):
     """
     Function returns the NBA Stats Ids of all players on a certain NBA team.
@@ -117,7 +143,6 @@ def player_ids_by_nba_team_name(nba_team):
     player_ids_in_team_list = [player[PERSON_ID_KEY] for player in common_all_players_dict if
                                player[TEAM_CITY_KEY] + " " + player[TEAM_NAME_KEY] == nba_team]
     return player_ids_in_team_list
-
 
 def nba_player_name_from_jersey_search(team_player_ids, yahoo_jersey_number):
     """
@@ -136,7 +161,6 @@ def nba_player_name_from_jersey_search(team_player_ids, yahoo_jersey_number):
                 COMMON_PLAYER_INFO][0][DISPLAY_FIRST_LAST]
             return nba_name
 
-
 def yahoo_name_to_nba_name(yahoo_player_name):
     """
     Function expectes a Yahoo player name and it will find the players Team Name and Jersey
@@ -151,9 +175,14 @@ def yahoo_name_to_nba_name(yahoo_player_name):
     nba_player_name = nba_player_name_from_jersey_search(player_ids_in_team_list, player_number)
     return nba_player_name
 
-
 def create_roster_dataframe(player_list):
-
+    """
+    Function creates a dataframe filled with rows of player average 9cat season stats. A player
+    list is looped and for each player name, a dataframe row is created. If the Yahoo player name
+    does not match the NBA player name, a function to convert Yahoo to NBA name is called.
+    @param player_list: list of player names
+    @return roster_dataframe: dataframe with season average 9cat stats for player list
+    """
     active_players = p9ca.nba_active_players()
     roster_dataframe = pd.DataFrame()
     for player in player_list:
@@ -166,65 +195,76 @@ def create_roster_dataframe(player_list):
                                                                                       active_players))
         except:
             print(f"Can't find player {player}")
-
     roster_dataframe.reset_index(inplace=True, drop=True)
-
     return roster_dataframe
 
-
 def format_roster_dataframe(roster_dataframe):
-
+    """
+    Function formats a dataframe by changing all 9cat columns to dtype float.
+    @param roster_dataframe: dataframe with season average 9cat stats for player list
+    @return: formatted dataframe with season average 9cat stats for player list
+    """
     for column in roster_dataframe.columns[1:]:
         roster_dataframe[column] = roster_dataframe[column].astype(float)
-
     roster_dataframe.loc[MEAN_ROW] = roster_dataframe.mean()
     roster_dataframe = p9ca.format_dataframe_decimals(roster_dataframe)
     try:
         roster_dataframe.drop(GAMES_COLUMN, axis=1, inplace=True)
     except:
         pass
-
     return roster_dataframe
 
-
 def team_9cat_average_stats(team_dictionary, league):
-
+    """
+    Function pipelines the process involved in creating a season average 9cat stats dataframe for a
+    team in the league.
+    @param team_dictionary: dictionary containing team information from league
+    @param league: Yahoo League constructor
+    @return: formatted dataframe with season average 9cat stats
+    """
     team = league.to_team(team_dictionary[TEAM_KEY])
     team_roster = team.roster()
     player_in_team_list = [player[NAME_KEY] for player in team_roster]
-
     roster_dataframe = create_roster_dataframe(player_in_team_list)
-
     roster_dataframe = format_roster_dataframe(roster_dataframe)
-
     return roster_dataframe
 
-
 def fantasy_team_mean_stats(roster_dataframe, team_dictionary):
-
+    """
+    Function filters and returns the season average 9cat stats dataframe by the "mean" row.
+    @param roster_dataframe: formatted dataframe with season average 9cat stats
+    @param team_dictionary: dictionary containing team information from league
+    @return: 1x10 dataframe showing average 9cat stats for an entire roster
+    """
     mean_series = roster_dataframe.loc[MEAN_ROW]
     mean_series[PLAYER_COLUMN] = team_dictionary[NAME_KEY]
     team_mean_dataframe = pd.DataFrame(mean_series).T
-    team_mean_dataframe = team_mean_dataframe.rename(columns={PLAYER_COLUMN : TEAM_COLUMN})
+    team_mean_dataframe = team_mean_dataframe.rename(columns={PLAYER_COLUMN: TEAM_COLUMN})
     team_mean_dataframe.reset_index(inplace=True, drop=True)
-
     return team_mean_dataframe
-
 
 def player_to_team_mean_stats(team_dictionary, league):
     """
     This function creates a dataframe containing the season averaged stats for each player on a
     Fantasy Team. It then finds the average stats for the entire team and returns a single row
     dataframe with the Fantasy Team name and its seasoned averaged 9cat stats.
+    @param team_dictionary: dictionary containing team information from league
+    @param league: Yahoo League constructor
+    @return: 1x10 dataframe showing average 9cat stats for an entire roster
     """
     roster_dataframe = team_9cat_average_stats(team_dictionary, league)
     team_mean_dataframe = fantasy_team_mean_stats(roster_dataframe, team_dictionary)
     return team_mean_dataframe
 
-
 @st.cache(show_spinner=False)
 def league_averages(league_team_list):
-
+    """
+    Function creates a dataframe with a row for each Yahoo Fantasy team in the league. The
+    columns of the dataframe are the teams mean 9cat stats (made up of each owned players 9cat
+    season stats). Function can take up to 15 minutes to run.
+    @param league_team_list: list of dictionaries containing information on each team in the league
+    @return: dataframe with each Yahoo Fantasy teams season averaged 9cat stats
+    """
     league_averages_dataframe = pd.DataFrame()
     for team in league_team_list:
         sc = yahoo_fantasy_api_authentication()
@@ -232,42 +272,50 @@ def league_averages(league_team_list):
         league_averages_dataframe = league_averages_dataframe.append(player_to_team_mean_stats
                                                                      (team, league))
     league_averages_dataframe.reset_index(drop=True, inplace=True)
-
     return league_averages_dataframe
 
-
 def yahoo_player_team_and_jersey(player_name):
-
+    """
+    Function finds a players real NBA team and jersey number from player name.
+    @param player_name: name of player on Yahoo Fantasy
+    @return players_team: NBA team player is active on
+    @return players_number: jersey number player wears
+    """
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
     player_details_dictionary = league.player_details(player_name)
     players_team = player_details_dictionary[0][EDITORIAL_TEAM_FULL_NAME]
     players_number = player_details_dictionary[0][UNIFORM_NUMBER]
-
     return players_team, players_number
 
-
 def player_ids_by_nba_team_name(nba_team):
-
+    """
+    Function finds all NBA Stats player ids for a provided NBA team name
+    @param nba_team: name of NBA team
+    @return: list of NBA Stats player ids in NBA team
+    """
     common_all_players = commonallplayers.CommonAllPlayers(is_only_current_season=1)
     common_all_players_dict = common_all_players.get_normalized_dict()[COMMON_ALL_PLAYERS]
     player_ids_in_team_list = [player[PERSON_ID_KEY] for player in common_all_players_dict if \
         player[TEAM_CITY_KEY] + " " + player[TEAM_NAME_KEY] == nba_team]
-
     return player_ids_in_team_list
 
-
 def nba_player_name_from_jersey_search(team_player_ids, yahoo_jersey_number):
-
+    """
+    Function uses a list of NBA Stats player ids and returns NBA Stats jersey numbers for each
+    id. If the NBA Stats jersey number matches the provided Yahoo Fantasy jersey number,
+    the NBA Stats name of the player that wears that jersey will be returned.
+    @param team_player_ids: list of NBA Stats player ids
+    @param yahoo_jersey_number: Yahoo Fantasy jersey number player wears
+    @return: NBA Stats player name
+    """
     for id in team_player_ids:
         nba_jersey_number = commonplayerinfo.CommonPlayerInfo(id).get_normalized_dict() \
             [COMMON_PLAYER_INFO][0][JERSEY_KEY]
         if nba_jersey_number == yahoo_jersey_number:
             nba_name = commonplayerinfo.CommonPlayerInfo(id).get_normalized_dict() \
             [COMMON_PLAYER_INFO][0][DISPLAY_FIRST_LAST]
-
             return nba_name
-
 
 def yahoo_name_to_nba_name(yahoo_player_name):
     """
@@ -275,161 +323,193 @@ def yahoo_name_to_nba_name(yahoo_player_name):
     Number. It then searches the NBA API for Player IDs belonging to found Team Name. For every
     Player ID it searches their Jersey Number. When there is a match, it returns the NBA Player
     Name.
+    @param yahoo_player_name: name of player on Yahoo Fantasy
+    @return: name of player on NBA Stats
     """
-
     player_team, player_number = yahoo_player_team_and_jersey(yahoo_player_name)
     player_ids_in_team_list = player_ids_by_nba_team_name(player_team)
     nba_player_name = nba_player_name_from_jersey_search(player_ids_in_team_list, player_number)
-
     return nba_player_name
-
 
 # Function to return team dataframe with 9cat averages
 def remove_mean_and_player(team_players_9cat_stats_dataframe, player_to_drop):
-
+    """
+    Function takes a Yahoo Fantasy teams average 9cat stat roster and removes a row from it,
+    corresponding, to the provided player from the player_to_drop parameter.
+    @param team_players_9cat_stats_dataframe: formatted dataframe with season average 9cat stats
+    for each player rostered on a team
+    @param player_to_drop: name of player to be dropped from team
+    @return: formatted dataframe with season average 9cat stats less player_to_drop row
+    """
     team_players_9cat_stats_dataframe = team_players_9cat_stats_dataframe.drop(MEAN_ROW)
     team_players_9cat_stats_dataframe = \
-        team_players_9cat_stats_dataframe[~team_players_9cat_stats_dataframe[PLAYER_COLUMN]
-    .str.contains(player_to_drop)]
-
+        team_players_9cat_stats_dataframe[~team_players_9cat_stats_dataframe[
+            PLAYER_COLUMN].str.contains(player_to_drop)]
     return team_players_9cat_stats_dataframe
 
 @st.cache(show_spinner=False)
 def waiver_add_and_drop(fantasy_team, player_to_drop, player_to_add):
-
+    """
+    Function simulates a player add/drop transaction. First a Yahoo Fantasy teams rostered season
+    average 9cat stats dataframe is calculated. The entire current rosters average 9cat stats are
+    calculated. The row containing the player name from parameter player_to_drop is removed and a
+    player and his season average 9cat stats from the player_to_add parameter is added to the
+    team dataframe. The entire new rosters average 9cat stats are calculated.
+    @param fantasy_team: dictionary containing team information from league
+    @param player_to_drop: name of player to drop from team
+    @param player_to_add: name of player to add to team (free agent)
+    @return team_players_9cat_stats_dataframe: current team rostered season average 9cat stats
+    dataframe
+    @return current_team_9cat_average_stats: current team rostered season average 9cat stats mean
+    row
+    @return new_team_9cat_average_stats_dataframe: new team rostered season average 9cat stats
+    dataframe
+    @return new_team_9cat_average_stats: new team rostered season average 9cat stats mean row
+    """
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
     team_players_9cat_stats_dataframe = team_9cat_average_stats(fantasy_team, league)
     current_team_9cat_average_stats = pd.DataFrame(team_players_9cat_stats_dataframe
                                                    .loc[MEAN_ROW]).T.drop(PLAYER_COLUMN, axis=1)
-
     removed_mean_dropped_player_dataframe = remove_mean_and_player\
         (team_players_9cat_stats_dataframe, player_to_drop)
-
     added_player_9cat_averages = p9ca.get_player_9cat_season_average(player_to_add)
     new_team_9cat_average_stats_dataframe = removed_mean_dropped_player_dataframe.append\
         (added_player_9cat_averages)
     new_team_9cat_average_stats_dataframe.reset_index(inplace=True, drop=True)
-
     new_team_9cat_average_stats_dataframe = format_roster_dataframe \
         (new_team_9cat_average_stats_dataframe)
-
     new_team_9cat_average_stats = pd.DataFrame(new_team_9cat_average_stats_dataframe
                                                    .loc[MEAN_ROW]).T.drop(PLAYER_COLUMN, axis=1)
-
     return team_players_9cat_stats_dataframe, current_team_9cat_average_stats, \
            new_team_9cat_average_stats_dataframe, new_team_9cat_average_stats
 
-
 # Format and find 9cat differences
 def remove_player_and_float_convert(dataframe):
-
+    """
+    Function cleans dataframe by converting all columns to dtype float
+    @param dataframe: dataframe with columns to convert
+    @return: converted dataframe
+    """
     for column in dataframe.columns:
         dataframe[column] = dataframe[column].astype(float)
-
     return dataframe
 
-
 def drop_add_mean_9cat_difference(current_9cat, new_9cat):
-
+    """
+    Function finds the difference in each 9cat stat by subtracting the current 9cat stats to the
+    new 9cat stats (found when a player is dropped and FA is added)
+    @param current_9cat: current team rostered season average 9cat stats mean dataframe row
+    @param new_9cat: new team rostered season average 9cat stats mean dataframe row
+    @return: 1x9 dataframe containing difference in 9cat stats
+    """
     current_9cat = remove_player_and_float_convert(current_9cat)
     new_9cat = remove_player_and_float_convert(new_9cat)
-
     difference_9cat = new_9cat.subtract(current_9cat)
-
     return difference_9cat
-
 
 # Visualise current, new and difference
 def visualise_team_9cat_averages(player_to_drop, player_to_add, current_9cat, new_9cat,
                                  difference_9cat, visualise=True):
     if visualise:
         print(f"You are dropping {player_to_drop} and adding {player_to_add}! \n")
-
         print("The current team 9cat averages are:\n")
         print(current_9cat)
         print("\n")
-
         print("The new team 9cat averages are:\n")
         print(new_9cat)
         print("\n")
-
         print("The difference 9cat averages are:\n")
         print(difference_9cat)
         print("\n")
     else:
         pass
 
-
 # Function for the entire process
 @st.cache(allow_output_mutation=True, show_spinner=False)
 def compare_team_9cats_on_transaction(team, player_to_drop, player_to_add, visualise=True):
-
+    """
+    Function pipelines the process involved in simulating a player add/drop transaction and
+    calculates 9cat stat differences between current and new roster average 9cat stat dataframes.
+    @param team: dictionary containing team information from league
+    @param player_to_drop: name of player to drop from team
+    @param player_to_add: name of player to add to team (free agent)
+    @param visualise: prints current/new/differnece dataframes
+    @return current_players_9cat_averages: current team rostered season average 9cat stats dataframe
+    @return current_team_9cat_averages: current team rostered season average 9cat stats mean row
+    @return new_players_9cat_averages: new team rostered season average 9cat stats dataframe
+    @return new_team_9cat_averages: new team rostered season average 9cat stats mean row
+    @return difference_team_9cat_averages: 1x9 dataframe containing difference in 9cat stats
+    """
     current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
     new_team_9cat_averages = waiver_add_and_drop(team, player_to_drop, player_to_add)
-
     difference_team_9cat_averages = drop_add_mean_9cat_difference(current_team_9cat_averages,
                                                   new_team_9cat_averages)
-
     visualise_team_9cat_averages(player_to_drop, player_to_add, current_team_9cat_averages,
                              new_team_9cat_averages, difference_team_9cat_averages, visualise)
-
     return current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
            new_team_9cat_averages, difference_team_9cat_averages
 
-
 def new_league_9cat_averages(league_average_dataframe, team, new_team_9cat_averages):
-
-    removed_team_dataframe = league_average_dataframe[~league_average_dataframe[TEAM_COLUMN].str\
-        .contains(team[NAME_KEY])]
-
+    """
+    Function calculates the new league averages dataframe by first removing the current teams row
+    via the team parameter. The new team 9cat average dataframe is appended to the league
+    averages dataframe.
+    @param league_average_dataframe: dataframe with each Yahoo Fantasy teams season averaged 9cat
+    stats
+    @param team: dictionary containing team information from league
+    @param new_team_9cat_averages: new team rostered season average 9cat stats mean row
+    @return: dataframe with each Yahoo Fantasy teams season averaged 9cat stats plus new team stats
+    """
+    removed_team_dataframe = league_average_dataframe[~league_average_dataframe[
+        TEAM_COLUMN].str.contains(team[NAME_KEY])]
     new_team_9cat_averages[TEAM_COLUMN] = team[NAME_KEY]
     added_team_dataframe = removed_team_dataframe.append(new_team_9cat_averages)
     added_team_dataframe.reset_index(drop=True, inplace=True)
-
     return added_team_dataframe
 
-
 def team_dataframe_column_float(roster_dataframe):
-
+    """
+    Function cleans roster dataframe by converting all columns (except PLAYER) to dtype float
+    @param roster_dataframe: roster dataframe with columns to convert
+    @return: converted roster dataframe
+    """
     for column in roster_dataframe.columns[1:]:
         roster_dataframe[column] = roster_dataframe[column].astype(float)
-
     return roster_dataframe
 
-
 def power_ranking_change(league_averages_dataframe, team, new_team_9cat_averages):
+    """
 
+    @param league_averages_dataframe:
+    @param team:
+    @param new_team_9cat_averages:
+    @return:
+    """
     # New league average dataframe
     new_league_averages_dataframe = new_league_9cat_averages(league_averages_dataframe,
                                                           team, new_team_9cat_averages)
-
     new_league_averages_dataframe = team_dataframe_column_float(new_league_averages_dataframe)
     new_league_averages_dataframe = new_league_averages_dataframe.sort_values(TEAM_COLUMN)
-
     # Get new rankings
     new_league_power_rankings = power_rankings(new_league_averages_dataframe).sort_values(TEAM_COLUMN)
     # Get current rankings
     current_league_power_rankings = power_rankings(league_averages_dataframe).sort_values(TEAM_COLUMN)
-
     # Drop Team column
     new_league_power_rankings_team = new_league_power_rankings.reset_index(drop=True)
     new_league_power_rankings = new_league_power_rankings_team.drop(TEAM_COLUMN, axis=1)
     current_league_power_rankings = current_league_power_rankings.reset_index(drop=True)
     current_league_power_rankings = current_league_power_rankings.drop(TEAM_COLUMN, axis=1)
-
     # Difference
     power_rankings_difference = new_league_power_rankings.subtract(current_league_power_rankings)
-
     # Sorted teams list
     teams = list(league_averages_dataframe.sort_values(TEAM_COLUMN)[TEAM_COLUMN])
-
     # Add teams column
     power_rankings_difference[TEAM_COLUMN] = teams
-
     # Rearrange columns
     columns = list(power_rankings_difference.columns)
     columns = [columns[-1]] + columns[:-1]
     power_rankings_difference = power_rankings_difference[columns]
-
     return new_league_averages_dataframe, new_league_power_rankings_team, power_rankings_difference
 
 
@@ -465,9 +545,9 @@ def power_rankings(dataframe):
 
 def color_negative_red(val):
     """
-    Takes a scalar and returns a string with
-    the css property `'color: red'` for negative
-    strings, black otherwise.
+    Takes a scalar and returns a string with the css property `'color: #EC7063'` for negative
+    strings, black when value is zero (0) and green when value is positive. This is used for all
+    9cat columns except for TOV.
     """
     if val == 0:
         color = "#000000"
@@ -479,9 +559,9 @@ def color_negative_red(val):
 
 def color_negative_red_tov(val):
     """
-    Takes a scalar and returns a string with
-    the css property `'color: red'` for negative
-    strings, black otherwise.
+    Takes a scalar and returns a string with the css property `'color: red'` for positive
+    strings, black when value is zero (0) and green when value is negative. This is used for the
+    TOV category column.
     """
     if val == 0:
         color = "#000000"
@@ -491,12 +571,10 @@ def color_negative_red_tov(val):
         color = '#52BE80'
     return 'color: %s' % color
 
-
 def color_power_rank(val):
     """
-    Takes a scalar and returns a string with
-    the css property `'color: red'` for negative
-    strings, black otherwise.
+    Takes a scalar and returns a string with the css property 'color' for different possible
+    values. This is used during the power ranking dataframe for all 9cat columns except for TOV.
     """
     if int(val[-3:-1]) == 0:
         color = "#FFFFFF"
@@ -512,9 +590,8 @@ def color_power_rank(val):
 
 def color_power_rank_tov(val):
     """
-    Takes a scalar and returns a string with
-    the css property `'color: red'` for negative
-    strings, black otherwise.
+    Takes a scalar and returns a string with the css property 'color' for different possible
+    values. This is used during the power ranking dataframe for the TOV category column.
     """
     if int(val[-3:-1]) == 0:
         color = "#FFFFFF"
@@ -528,50 +605,63 @@ def color_power_rank_tov(val):
         color = "#52BE80"
     return 'background-color: %s' % color
 
-
 def get_team_id_from_team_name(team_name):
-
+    """
+    Function finds team id in team dictionary from team name.
+    @param team_name: name of Yahoo Fantasy team
+    @return: id of Yahoo Fantasy team
+    """
     return "".join([x[TEAM_KEY] for x in league_team_list if x[NAME_KEY] == team_name])
 
-
 def team_player_list(team_id):
+    """
+    Function returns Yahoo Fantasy player names that are actively rostered in a team id.
+    @param team_id: id of Yahoo Fantasy team
+    @return: list of rostered players
+    """
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
     team = league.to_team(team_id)
     team_roster = team.roster()
     player_in_team_list = [player[NAME_KEY] for player in team_roster]
-
     return player_in_team_list
 
-
 def streamlit_return_players_on_team(team_name):
-
+    """
+    Streamlit function to return sorted player names rostered by team with a team name argument.
+    @param team_name: name of Yahoo Fantasy team
+    @return: sorted list of rostered players
+    """
     team_id = get_team_id_from_team_name(team_name)
     player_list = team_player_list(team_id)
     player_list = sorted(player_list)
-
     return player_list
 
 @st.cache(show_spinner=False)
 def get_league_free_agents():
-    # Free agents
+    """
+    Function queries the Yahoo Fantasy API to return a list of the leagues current free agents (FA).
+    @return: sorted list of free agents
+    """
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
     free_agent_guards = league.free_agents("G")
     free_agent_forwards = league.free_agents("F")
     free_agent_centers = league.free_agents("C")
-
     free_agents = [player[NAME_KEY] for player in free_agent_guards] \
-                  + [player[NAME_KEY] for player in free_agent_forwards] \
-                  + [player[NAME_KEY] for player in free_agent_centers]
-
+        + [player[NAME_KEY] for player in free_agent_forwards] \
+        + [player[NAME_KEY] for player in free_agent_centers]
     free_agents = list(set(free_agents))
     sorted_free_agents = sorted(free_agents)
-
     return sorted_free_agents
 
 @st.cache(show_spinner=False)
-def get_team_roster(team_dict):
+def get_team_roster_stats_dataframe(team_dict):
+    """
+    Function returns a dataframe with a desired teams players season average 9cat stats
+    @param team_dict: dictionary containing team information from league
+    @return: team roster season average 9cat stats dataframe
+    """
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
     team_9cat_stats = team_9cat_average_stats(team_dict, league)
@@ -580,8 +670,6 @@ def get_team_roster(team_dict):
 @st.cache(show_spinner=False, allow_output_mutation=True)
 def streamlit_waiver_add_and_drop(current_9cat_roster_averages, player_to_drop, player_to_add):
 
-    sc = yahoo_fantasy_api_authentication()
-    league = yahoo_fantasy_league(sc)
     team_players_9cat_stats_dataframe = current_9cat_roster_averages
     current_team_9cat_average_stats = pd.DataFrame(team_players_9cat_stats_dataframe
                                                    .loc[MEAN_ROW]).T.drop(PLAYER_COLUMN, axis=1)
@@ -607,41 +695,47 @@ def streamlit_waiver_add_and_drop(current_9cat_roster_averages, player_to_drop, 
            new_team_9cat_average_stats_dataframe, new_team_9cat_average_stats, \
            difference_team_9cat_averages
 
-
 def get_overall_power_rank(power_ranking_dataframe):
-
+    """
+    Function finds the Power Rankings for each team in the dataframe by adding each rows column
+    positions and subtracting total from 109. Max PR score is 100.
+    @param power_ranking_dataframe: dataframe with columns scored by their respective row standings
+    @return: dataframe with columns scored by their respective row standings plus overall PR column
+    """
     power_ranking_dataframe = power_ranking_dataframe.set_index(TEAM_COLUMN)
-    power_ranking_dataframe["PR"] = 109 - power_ranking_dataframe.sum(axis=1,
-                                                                              numeric_only=True)
+    power_ranking_dataframe[PR_COLUMN] = 109 - power_ranking_dataframe.sum(axis=1,
+                                                                           numeric_only=True)
     columns = list(power_ranking_dataframe.columns)
     columns = [columns[-1]] + columns[:-1]
     power_ranking_dataframe = power_ranking_dataframe[columns]
-    power_ranking_dataframe = power_ranking_dataframe.sort_values("PR",
-                                                                  ascending=False)
-
+    power_ranking_dataframe = power_ranking_dataframe.sort_values(PR_COLUMN, ascending=False)
     return power_ranking_dataframe
-
 
 def clean_league_averages_dataframe(league_averages_dataframe):
 
     league_averages_dataframe_sorted = league_averages_dataframe.sort_values(TEAM_COLUMN,
-                                                                      ascending=True)
+                                                                             ascending=True)
     league_averages_dataframe_index = league_averages_dataframe_sorted.set_index(TEAM_COLUMN)
-
     return league_averages_dataframe_index
 
 
 # Final averages/power_ranking/change
 def columns_to_string(new_league_averages_dataframe, new_league_power_rankings,
                       power_rankings_difference):
+    """
 
+    @param new_league_averages_dataframe:
+    @param new_league_power_rankings:
+    @param power_rankings_difference:
+    @return:
+    """
     overall_power_rank_dataframe = pd.DataFrame()
     overall_power_rank_dataframe[TEAM_COLUMN] = new_league_averages_dataframe[TEAM_COLUMN]
     for column in new_league_averages_dataframe.columns[1:]:
         overall_power_rank_dataframe[column] = \
             new_league_averages_dataframe[column].astype(str) + " [" + new_league_power_rankings[
-                column + " "].astype(str) + ", " + power_rankings_difference[column + " "].astype(str) + "]"
-
+            column + " "].astype(str) + ", " + power_rankings_difference[column + " "].astype(
+                str) + "]"
     return overall_power_rank_dataframe
 
 
@@ -690,58 +784,17 @@ def get_overall_power_rank_to_different_dataframe(power_ranking_dataframe, dataf
 def get_average_and_power_ranking_change(league_averages_dataframe, team_dict,
                                          new_team_9cat_averages):
 
-    new_league_averages_dataframe, new_league_power_rankings, power_rankings_difference = power_ranking_change(league_averages_dataframe, team_dict, new_team_9cat_averages)
+    new_league_averages_dataframe, new_league_power_rankings, power_rankings_difference = \
+        power_ranking_change(league_averages_dataframe, team_dict, new_team_9cat_averages)
 
     new_league_averages_dataframe = new_league_averages_dataframe.reset_index(drop=True)
     unformatted_overall_power_rankings = columns_to_string(new_league_averages_dataframe,
                                                            new_league_power_rankings,
                                                            power_rankings_difference)
-
     format_overall_power_dataframe = format_overall_power_rankings(unformatted_overall_power_rankings)
-
     returned_dataframe = get_overall_power_rank_to_different_dataframe(new_league_power_rankings,
                                                    format_overall_power_dataframe)
-
     return returned_dataframe
-
-
-import requests
-import pandas as pd
-from src.data import all_functions as af
-
-PLAYER_COLUMN = "PLAYER"
-TEAM_KEY = "team_key"
-PLAYER_ID_KEY = "player_id"
-NAME_KEY = "name"
-MEAN_ROW = "mean"
-NAME_KEY = "name"
-LSCD_KEY = "lscd"
-MSCD_KEY = "mscd"
-G_KEY = "g"
-GID_KEY = "gid"
-GAME_ID_KEY = "game_id"
-GDATE_KEY = "gdte"
-GAME_DATE_KEY= "game_date"
-V_KEY = "v"
-TID_KEY = "tid"
-VISITORS_TEAM_ID_KEY = "visitors_tid"
-VISITORS_KEY =  "visitors"
-TC_KEY = "tc"
-TN_KEY = "tn"
-H_KEY = "h"
-HOME_TEAM_ID_KEY = "home_tid"
-HOME_KEY = "home"
-TOTAL_ROW = "total"
-INDEX_COLUMN = "index"
-NBA_NAME_LA_CLIPPERS = "LA Clippers"
-YAHOO_NAME_LA_CLIPPERS = "Los Angeles Clippers"
-COLUMN_9CAT_DECIMAL_FORMAT = {af.FIELD_GOAL_PERCENTAGE_COLUMN : af.THREE_DECIMAL_FORMAT,
-     af.FREE_THROW_PERCENTAGE_COLUMN : af.THREE_DECIMAL_FORMAT,
-     af.THREES_MADE_COLUMN : af.TWO_DECIMAL_FORMAT,
-     af.POINTS_COLUMN : af.TWO_DECIMAL_FORMAT,
-     af.REBOUNDS_COLUMN : af.TWO_DECIMAL_FORMAT,
-     af.ASSITS_COLUMN : af.TWO_DECIMAL_FORMAT, af.STEALS_COLUMN : af.TWO_DECIMAL_FORMAT,
-     af.BLOCKS_COLUMN : af.TWO_DECIMAL_FORMAT, af.TURNOVERS_COLUMN : af.TWO_DECIMAL_FORMAT}
 
 def columns_to_dtype_float(dataframe):
     """
@@ -1056,6 +1109,10 @@ def weekly_matchup_evaluator(team1_dict, team2_dict, team1_9cat_average_stats_da
 
 # Wide mode
 def _max_width_():
+    """
+    Function sets width for Streamlit app
+    @return: None
+    """
     max_width_str = f"max-width: 1350px;"
     st.markdown(
         f"""
@@ -1132,7 +1189,7 @@ elif team == YOBITCH_TOPPIN_ME[NAME_KEY]:
 
 # Load team dataframe
 with st.spinner(f"Getting {team} team information..."):
-    team_9cat_stats = get_team_roster(team_dict)
+    team_9cat_stats = get_team_roster_stats_dataframe(team_dict)
 
 # Selected Team Players
 players = streamlit_return_players_on_team(team)
