@@ -41,6 +41,7 @@ ASSITS_COLUMN = "AST"
 STEALS_COLUMN = "STL"
 BLOCKS_COLUMN = "BLK"
 TURNOVERS_COLUMN = "TOV"
+CATS_COLUMNS = "CATS"
 POWER_RANK_COLUMN = "Power_Rank"
 PR_COLUMN = "PR"
 PLAYER_ID_KEY = "player_id"
@@ -65,6 +66,21 @@ TOTAL_ROW = "total"
 INDEX_COLUMN = "index"
 NBA_NAME_LA_CLIPPERS = "LA Clippers"
 YAHOO_NAME_LA_CLIPPERS = "Los Angeles Clippers"
+FANTASY_CONTENT_KEY = "fantasy_content"
+LEAGUE_KEY = "league"
+SCOREBOARD_KEY = "scoreboard"
+ZERO_KEY = "0"
+MATCHUPS_KEY = "matchups"
+MATCHUP_KEY = "matchup"
+TEAMS_KEY = "teams"
+ONE_KEY = "1"
+TEAM_KEY_2 = "team"
+NAME_KEY = "name"
+TEAM_STATS_KEY = "team_stats"
+STATS_KEY = "stats"
+STAT_KEY = "stat"
+VALUE_KEY = "value"
+MATCHUP_COLUMNS = [af.PLAYER_COLUMN] + af.NINE_CAT_COLUMNS
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
                        STEALS_COLUMN, BLOCKS_COLUMN, TURNOVERS_COLUMN]
@@ -73,6 +89,14 @@ STREAMLIT_TABLE_FORMAT = {"FG_PCT": p9ca.THREE_DECIMAL_FORMAT, "FT_PCT": p9ca.TH
                           "REB": p9ca.TWO_DECIMAL_FORMAT, "AST": p9ca.TWO_DECIMAL_FORMAT,
                           "STL": p9ca.TWO_DECIMAL_FORMAT, "BLK": p9ca.TWO_DECIMAL_FORMAT,
                           "TOV": p9ca.TWO_DECIMAL_FORMAT}
+
+ZERO_DECIMAL_FORMAT = "{:d}".format
+STREAMLIT_LIVE_SCORES_TABLE_FORMAT = {"FG_PCT": p9ca.THREE_DECIMAL_FORMAT,
+                                      "FT_PCT": p9ca.THREE_DECIMAL_FORMAT,
+                          "FG3M": ZERO_DECIMAL_FORMAT, "PTS": ZERO_DECIMAL_FORMAT,
+                          "REB": ZERO_DECIMAL_FORMAT, "AST": ZERO_DECIMAL_FORMAT,
+                          "STL": ZERO_DECIMAL_FORMAT, "BLK": ZERO_DECIMAL_FORMAT,
+                          "TOV": ZERO_DECIMAL_FORMAT}
 COLUMN_9CAT_DECIMAL_FORMAT = {af.FIELD_GOAL_PERCENTAGE_COLUMN: af.THREE_DECIMAL_FORMAT,
                               af.FREE_THROW_PERCENTAGE_COLUMN: af.THREE_DECIMAL_FORMAT,
                               af.THREES_MADE_COLUMN: af.TWO_DECIMAL_FORMAT,
@@ -97,6 +121,11 @@ EL_LADRON_DE_CABRAS = {'team_key': '402.l.55374.t.12', 'name': 'El Ladrón de Ca
 league_team_list = [LALALAND, AUTOPICK, CRABBEHERBYTHEPUSSY, MAGICS_JOHNSON, MCCURRY,
                     NUNN_OF_YALL_BETTA, RUSTY_CUNTBROOKS, WAKANDA_FOREVER, SWAGGY_P,
                     YOBITCH_TOPPIN_ME, TVONS_TIP_TOP_TEAM, EL_LADRON_DE_CABRAS]
+LEAGUE_TEAM_NAMES = [AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY],
+                     EL_LADRON_DE_CABRAS[NAME_KEY], LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY],
+                     MCCURRY[NAME_KEY], NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY],
+                     SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
+                     YOBITCH_TOPPIN_ME[NAME_KEY]]
 
 def yahoo_fantasy_api_authentication():
     """
@@ -1106,6 +1135,294 @@ def weekly_matchup_evaluator(team1_dict, team2_dict, team1_9cat_average_stats_da
     total_difference_dataframe_colored = applymap_color_and_format(total_difference_dataframe)
     return total_difference_dataframe, total_difference_dataframe_colored
 
+def get_teams_matchup_number(team_dict, matchups):
+    """
+    Function loops through returned the returned Yahoo Fantasy matchup nested dictionary to find
+    the matchup number of the specified parameter team name.
+    param team_dict (dictionary): dictionary containing information about a owners team
+    param matchups (dictionary): league matchup information from specified week number
+    return matchup (string): string value for the index of the specified teams nested matchup
+    dictionary in the original matchup dictionary
+    """
+    for matchup in range(len(matchups[FANTASY_CONTENT_KEY][LEAGUE_KEY][1][SCOREBOARD_KEY][ZERO_KEY]\
+                [MATCHUPS_KEY]) - 1):
+        if matchups[FANTASY_CONTENT_KEY][LEAGUE_KEY][1][SCOREBOARD_KEY][ZERO_KEY]\
+                [MATCHUPS_KEY][str(matchup)][MATCHUP_KEY][ZERO_KEY][TEAMS_KEY][ZERO_KEY]\
+                [TEAM_KEY_2][0][2][NAME_KEY] == team_dict[NAME_KEY] \
+                or matchups[FANTASY_CONTENT_KEY][LEAGUE_KEY][1][SCOREBOARD_KEY][ZERO_KEY]\
+                [MATCHUPS_KEY][str(matchup)][MATCHUP_KEY][ZERO_KEY][TEAMS_KEY][ONE_KEY]\
+                [TEAM_KEY_2][0][2][NAME_KEY] == team_dict[NAME_KEY]:
+            return str(matchup)
+
+def get_team_name_from_matchup(matchups, matchup_number, matchup_team_number):
+    """
+    Function returns the team name in a matchup.
+    param matchups (dictionary): league matchup information from specified week number
+    param matchup_number (string): matchup number for in matchups dictionary
+    param matchup_team_number (string): either "0" or "1" indicating matchup team number
+    return team_name (string): name of team in matchup
+    """
+    team_name = matchups[FANTASY_CONTENT_KEY][LEAGUE_KEY][1][SCOREBOARD_KEY][ZERO_KEY]\
+                [MATCHUPS_KEY][matchup_number][MATCHUP_KEY][ZERO_KEY][TEAMS_KEY]\
+                [matchup_team_number][TEAM_KEY_2][0][2][NAME_KEY]
+    return team_name
+
+def get_live_matchup_stats_dictionary(matchups, matchup_number, matchup_team_number):
+    """
+    Function returns a dictionary containing 9cat stats plus two more for a given matchup and
+    matchup team number.
+    param matchups (dictionary): league matchup information from specified week number
+    param matchup_number (string): matchup number for in matchups dictionary
+    param matchup_team_number (string): either "0" or "1" indicating matchup team number
+    return live_matchup_stats (dictionary): dictionary of 9cat stats plus two more stats
+    """
+    live_matchup_stats = matchups[FANTASY_CONTENT_KEY][LEAGUE_KEY][1][SCOREBOARD_KEY][ZERO_KEY]\
+                [MATCHUPS_KEY][matchup_number][MATCHUP_KEY][ZERO_KEY][TEAMS_KEY]\
+                [matchup_team_number][TEAM_KEY_2][1][TEAM_STATS_KEY][STATS_KEY]
+    return live_matchup_stats
+
+def get_dataframe_from_live_matchup_stats(matchup_stats_dictionary, team_name):
+    """
+    Function creates a 1x10 dataframe containing the name of the team along with this live 9cat
+    stats for a weeks matchup.
+    param matchup_stats_dictionary (dictionary): dictionary containing the stats for a team
+    param team_name (string): the name of the team
+    return live_matchup_9cat_stats_dataframe (pandas dataframe): dataframe containing the name of the team along with this live 9cat
+    stats for a weeks matchup
+    """
+    matchup_9cat_stats_list = list()
+    for index in range(len(matchup_stats_dictionary)):
+        if index != 0 and index != 2:
+            matchup_9cat_stats_list.append(matchup_stats_dictionary[index][STAT_KEY][VALUE_KEY])
+    values = [team_name] + matchup_9cat_stats_list
+    live_matchup_9cat_stats_dataframe = pd.DataFrame(values).T
+    live_matchup_9cat_stats_dataframe.columns = MATCHUP_COLUMNS
+    return live_matchup_9cat_stats_dataframe
+
+
+def applymap_color_and_format(dataframe):
+    """
+    Function takes a dataframe containing 9cat stat columns differneces and returns a color coded
+    and decimal place formatted dataframe for visual ease.
+    param dataframe (pandas dataframe): dataframe to format
+    returns dataframe (pandas dataframe): dataframe with formatted and colored values
+    """
+    colored_matchup_difference = dataframe.style.applymap(
+        af.color_negative_red, subset=pd.IndexSlice[:,[af.FIELD_GOAL_PERCENTAGE_COLUMN,
+                                                       af.FREE_THROW_PERCENTAGE_COLUMN,
+                                                       af.THREES_MADE_COLUMN, af.POINTS_COLUMN,
+                                                       af.REBOUNDS_COLUMN, af.ASSITS_COLUMN,
+                                                       af.STEALS_COLUMN, af.BLOCKS_COLUMN
+                                                       ]]).applymap(
+        af.color_negative_red_tov, subset=pd.IndexSlice[:,[af.TURNOVERS_COLUMN]]).format\
+        (COLUMN_9CAT_DECIMAL_FORMAT)
+    return colored_matchup_difference
+
+def format_3ptm_to_tov_as_int(dataframe):
+    """
+    Function changes the 3ptm to tov columns to dtype int needed for the live score dataframes.
+    @param dataframe: dataframe with columns to convert
+    @return: converted dataframe
+    """
+    for column in dataframe.columns[2:]:
+        dataframe[column] = dataframe[column].astype(int)
+    return dataframe
+
+
+def get_matchup_teams_9cat_stat_dataframes(week, team_dict):
+    """
+
+    @param week:
+    @type week:
+    @param team_dict:
+    @type team_dict:
+    @return:
+    @rtype:
+    """
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    matchups = league.matchups(week=week)
+    matchup_number = get_teams_matchup_number(team_dict, matchups)
+    first_team_name = get_team_name_from_matchup(matchups, matchup_number, "0")
+    second_team_name = get_team_name_from_matchup(matchups, matchup_number, "1")
+    first_team_stats_dictionary = get_live_matchup_stats_dictionary(matchups, matchup_number,
+                                                                    "0")
+    second_team_stats_dictionary = get_live_matchup_stats_dictionary(matchups, matchup_number,
+                                                                     "1")
+    first_team_stats_dataframe = get_dataframe_from_live_matchup_stats(first_team_stats_dictionary,
+                                                              first_team_name)
+    first_team_stats_dataframe = first_team_stats_dataframe.set_index(PLAYER_COLUMN)
+    second_team_stats_dataframe = get_dataframe_from_live_matchup_stats(second_team_stats_dictionary,
+                                                              second_team_name)
+    second_team_stats_dataframe = second_team_stats_dataframe.set_index(PLAYER_COLUMN)
+    matchup_stats_dataframe = first_team_stats_dataframe.append(second_team_stats_dataframe)
+    matchup_stats_dataframe = remove_player_and_float_convert(matchup_stats_dataframe)
+    matchup_stats_dataframe = format_3ptm_to_tov_as_int(matchup_stats_dataframe)
+    return first_team_name, first_team_stats_dataframe, second_team_name, \
+           second_team_stats_dataframe, matchup_stats_dataframe
+
+def get_team_predicted_stats_dataframe(team_name, schedule_dataframe, week_start_date,
+                                       week_end_date):
+    """
+    Function creates a dataframe containing the predicted 9cat stats for a teams roster dependent
+    on the amount of games each player has left to play in the stated date range.
+    @param team_name (string): name of Yahoo Fantasy team
+    @param schedule_dataframe (pandas dataframe): dataframe containing the entire seasons
+    NBA schedule
+    @param week_start_date (string): start date of to begin schedule_dataframe filtering
+    @param week_end_date (string): endd date of to begin schedule_dataframe filtering
+    @return predicted_stats_dataframe: predicted 9cat stats for a teams roster
+    @return team_dictionary (dictionary): dictionary of team from league
+    """
+    team_dictionary = get_team_dict_from_team_name(team_name)
+    name_id_dictionary, name_list = get_player_ids_names_in_fantasy_team(team_dictionary)
+    games_left_dataframe, games_left_series = get_fantasy_week_games_dataframe\
+        (schedule_dataframe, week_start_date, week_end_date)
+    player_game_dictionary = get_player_games(games_left_series, name_list)
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    team_9cat_average_stats_dataframe = af.team_9cat_average_stats(team_dictionary, league)
+    predicted_stats_dataframe = get_predicted_player_weekly_9cat(player_game_dictionary,
+                                                                team_9cat_average_stats_dataframe)
+    return predicted_stats_dataframe, team_dictionary
+
+def get_clean_predicted_stats_dataframe(predicted_stats_dataframe, team_dict):
+    """
+    Function cleans the predicted stats dataframe by creating a total row and adding the name of
+    the team via the team_dict parameter.
+    @param predicted_stats_dataframe (pandas dataframe): predicted 9cat stats for a teams roster
+    @param team_dict (dictionary): dictionary of team from league
+    @return total_row_predicted_stats_datafame: 1x10 predicted 9cat dataframes
+    @return total_row_predicted_stats_datafame_no_name: 1x9 predicted 9cat dataframes (without
+    team name)
+    """
+    dataframe_with_total = get_total_row(predicted_stats_dataframe)
+    total_row_predicted_stats_datafame, total_row_predicted_stats_datafame_no_name = \
+        get_filtered_total_row(dataframe_with_total, team_dict)
+    return total_row_predicted_stats_datafame, total_row_predicted_stats_datafame_no_name
+
+def add_live_stats_and_predicted_dataframes(live_stats_dataframe,
+                                            total_row_predicted_stats_datafame, team_name):
+    """
+    Function adds the dataframes containing live matchup stats and the predicted game stats. It
+    returns a 1x10 dataframe with team name and 9cat stats.
+    @param live_stats_dataframe (pandas dataframe): current matchup 9cat stats for a team roster
+    @param total_row_predicted_stats_datafame (pandas dataframe): total row predicted 9cat stats
+    for a team roster
+    @param team_name (string): name of Yahoo Fantasy team
+    @return live_plus_prediction_dataframe: 1X10 9cat live plus predicted 9cat stats dataframe
+    """
+    total_row_predicted_stats_datafame.reset_index(inplace=True, drop=True)
+    live_stats_dataframe = columns_to_dtype_float(live_stats_dataframe)
+    # live_stats_dataframe.drop(PLAYER_COLUMN, axis=1, inplace=True)
+    total_row_predicted_stats_datafame.drop(PLAYER_COLUMN, axis=1, inplace=True)
+    live_plus_prediction_dataframe = live_stats_dataframe.add(total_row_predicted_stats_datafame)
+    temporary_dataframe = pd.DataFrame()
+    temporary_dataframe[PLAYER_COLUMN] = team_name
+    live_plus_prediction_dataframe = pd.concat([temporary_dataframe,
+                                                live_plus_prediction_dataframe])
+    live_plus_prediction_dataframe[PLAYER_COLUMN] = team_name
+    return live_plus_prediction_dataframe
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def live_plus_prediction_matchup_dataframe(schedule_dataframe, team_name, current_date,
+                                           week_end_date):
+    """
+
+    @param schedule_dataframe:
+    @param team_name:
+    @param current_date:
+    @param week_end_date:
+    @return:
+    """
+    predicted_stats_dataframe, team_dictionary = get_team_predicted_stats_dataframe \
+        (team_name, schedule_dataframe, current_date, week_end_date)
+    total_row_predicted_stats_datafame, total_row_predicted_stats_datafame_no_name = \
+        get_clean_predicted_stats_dataframe(predicted_stats_dataframe, team_dictionary)
+    live_plus_prediction_dataframe = add_live_stats_and_predicted_dataframes(team1_live_stats,
+                                                                             total_row_predicted_stats_datafame,
+                                                                             team_name)
+    return live_plus_prediction_dataframe
+
+
+def get_team_dict_from_team_name(team_name):
+    """
+    Function returns the team dictionary from a team name.
+    @param team_name: name of fantasy team
+    @type team_name: string
+    @return: dictionary of fantasy team
+    @rtype: dictionary
+    """
+    if team_name == af.AUTOPICK[NAME_KEY]:
+        team_dict = af.AUTOPICK
+    elif team_name == af.CRABBEHERBYTHEPUSSY[NAME_KEY]:
+        team_dict = af.CRABBEHERBYTHEPUSSY
+    elif team_name == af.EL_LADRON_DE_CABRAS[NAME_KEY]:
+        team_dict = af.EL_LADRON_DE_CABRAS
+    elif team_name == af.LALALAND[NAME_KEY]:
+        team_dict = af.LALALAND
+    elif team_name == af.MAGICS_JOHNSON[NAME_KEY]:
+        team_dict = af.MAGICS_JOHNSON
+    elif team_name == af.MCCURRY[NAME_KEY]:
+        team_dict = af.MCCURRY
+    elif team_name == af.NUNN_OF_YALL_BETTA[NAME_KEY]:
+        team_dict = af.NUNN_OF_YALL_BETTA
+    elif team_name == af.RUSTY_CUNTBROOKS[NAME_KEY]:
+        team_dict = af.RUSTY_CUNTBROOKS
+    elif team_name == af.SWAGGY_P[NAME_KEY]:
+        team_dict = af.SWAGGY_P
+    elif team_name == af.TVONS_TIP_TOP_TEAM[NAME_KEY]:
+        team_dict = af.TVONS_TIP_TOP_TEAM
+    elif team_name == af.WAKANDA_FOREVER[NAME_KEY]:
+        team_dict = af.WAKANDA_FOREVER
+    elif team_name == af.YOBITCH_TOPPIN_ME[NAME_KEY]:
+        team_dict = af.YOBITCH_TOPPIN_ME
+    return team_dict
+
+def move_column_inplace(df, col, pos):
+    col = df.pop(col)
+    df.insert(pos, col.name, col)
+
+def get_winning_cats(matchup_stats_dataframe):
+    """
+    Function counts, for each team (row) in dataframe, which team has better category values.
+    This provides a score informing total categories that each team is winning.
+    @param matchup_stats_dataframe:
+    @return: dataframe with category win count column
+    """
+    count_team1_win_list = 0
+    count_team2_win_list = 0
+    for column in matchup_stats_dataframe.columns[:-1]:
+        if matchup_stats_dataframe[column][0] > matchup_stats_dataframe[column][1]:
+            count_team1_win_list += 1
+        elif matchup_stats_dataframe[column][0] < matchup_stats_dataframe[column][1]:
+            count_team2_win_list += 1
+        else:
+            pass
+    if matchup_stats_dataframe[TURNOVERS_COLUMN][0] > matchup_stats_dataframe[TURNOVERS_COLUMN][1]:
+        count_team2_win_list += 1
+    elif matchup_stats_dataframe[TURNOVERS_COLUMN][0] < matchup_stats_dataframe[TURNOVERS_COLUMN][1]:
+        count_team1_win_list += 1
+    else:
+        pass
+    team_stat_win_list = [count_team1_win_list, count_team2_win_list]
+    matchup_stats_dataframe[CATS_COLUMNS] = team_stat_win_list
+    move_column_inplace(matchup_stats_dataframe, CATS_COLUMNS, 0)
+    return matchup_stats_dataframe
+
+def get_live_matchup_stats_pipeline(team_dictionary):
+    """
+    Function pipelines the process involved in returning, for a specified team, its matchups
+    live stats and category win columns count
+    @param team_dictionary: dictionary containing team information from league
+    @return: dataframe with live matchup 9cat stats and category win count column
+    """
+    current_fantasy_week, week_start_date, week_end_date = get_week_current_week_information()
+    team1_name, team1_live_stats, team2_name, team2_live_stats, matchup_stats_dataframe = \
+        get_matchup_teams_9cat_stat_dataframes(current_fantasy_week, team_dictionary)
+    matchup_stats_dataframe = get_winning_cats(matchup_stats_dataframe)
+    return current_fantasy_week, team1_name, team1_live_stats, team2_name, team2_live_stats, \
+           matchup_stats_dataframe
 
 # Wide mode
 def _max_width_():
@@ -1125,9 +1442,31 @@ def _max_width_():
         unsafe_allow_html=True,
     )
 
+def highlight_max(s):
+    is_large = s.nlargest(1).values
+    return ['font-weight: bold' if v in is_large else '' for v in s]
+
 # Force load in wide mode
 _max_width_()
 
+# Live standings
+live_standings_team = st.selectbox(
+     'Lebrontourage Teams',
+     ("Select a Team", AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY],
+      EL_LADRON_DE_CABRAS[NAME_KEY], LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY],
+      MCCURRY[NAME_KEY], NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY],
+      SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
+      YOBITCH_TOPPIN_ME[NAME_KEY]), 0, key="team2")
+if live_standings_team not in LEAGUE_TEAM_NAMES:
+    st.warning('Select a team...')
+    st.stop()
+live_standings_team_dict = get_team_dict_from_team_name(live_standings_team)
+current_fantasy_week, team1_name, team1_live_stats, team2_name, team2_live_stats, \
+    live_matchup_stats_dataframe = get_live_matchup_stats_pipeline(live_standings_team_dict)
+st.write("")
+st.write(f"The live scores for the week {current_fantasy_week} matchup between {team1_name} "
+         f"and {team2_name} are...")
+st.table(live_matchup_stats_dataframe.style.apply(highlight_max).format(STREAMLIT_LIVE_SCORES_TABLE_FORMAT))
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
@@ -1150,42 +1489,12 @@ team = st.sidebar.selectbox(
       SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
       YOBITCH_TOPPIN_ME[NAME_KEY]), 0)
 
-LEAGUE_TEAM_NAMES = [AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY],
-                     EL_LADRON_DE_CABRAS[NAME_KEY], LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY],
-                     MCCURRY[NAME_KEY], NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY],
-                     SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
-                     YOBITCH_TOPPIN_ME[NAME_KEY]]
-
-
 if team not in LEAGUE_TEAM_NAMES:
     st.warning('Select a team...')
     st.stop()
 
 # Reference variables
-if team == AUTOPICK[NAME_KEY]:
-    team_dict = AUTOPICK
-elif team == CRABBEHERBYTHEPUSSY[NAME_KEY]:
-    team_dict = CRABBEHERBYTHEPUSSY
-elif team == EL_LADRON_DE_CABRAS[NAME_KEY]:
-    team_dict = EL_LADRON_DE_CABRAS
-elif team == LALALAND[NAME_KEY]:
-    team_dict = LALALAND
-elif team == MAGICS_JOHNSON[NAME_KEY]:
-    team_dict = MAGICS_JOHNSON
-elif team == MCCURRY[NAME_KEY]:
-    team_dict = MCCURRY
-elif team == NUNN_OF_YALL_BETTA[NAME_KEY]:
-    team_dict = NUNN_OF_YALL_BETTA
-elif team == RUSTY_CUNTBROOKS[NAME_KEY]:
-    team_dict = RUSTY_CUNTBROOKS
-elif team == SWAGGY_P[NAME_KEY]:
-    team_dict = SWAGGY_P
-elif team == TVONS_TIP_TOP_TEAM[NAME_KEY]:
-    team_dict = TVONS_TIP_TOP_TEAM
-elif team == WAKANDA_FOREVER[NAME_KEY]:
-    team_dict = WAKANDA_FOREVER
-elif team == YOBITCH_TOPPIN_ME[NAME_KEY]:
-    team_dict = YOBITCH_TOPPIN_ME
+team_dict = get_team_dict_from_team_name(team)
 
 # Load team dataframe
 with st.spinner(f"Getting {team} team information..."):
@@ -1254,7 +1563,7 @@ if st.button('Power Rankings'):
              "ranked ")
     st.table(league_power_rankings_index)
 
-    st.table(ranking_change_dataframe.style.applymap(color_power_rank, subset=pd.IndexSlice[:, \
+    st.table(ranking_change_dataframe.style.applymap(color_power_rank, subset=pd.IndexSlice[:,  \
         ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST","STL", "BLK"]]).applymap(
         color_power_rank_tov, subset=pd.IndexSlice[:, ["TOV"]]))
 
