@@ -84,6 +84,7 @@ RANK_KEY = "rank"
 CURRENT_COLUMN = "Current"
 NEW_COLUMN = "New"
 DIFFERENCE_COLUMN = "Difference"
+DAILY_COLUMNS = ["Total", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MATCHUP_COLUMNS = [af.PLAYER_COLUMN] + af.NINE_CAT_COLUMNS
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
@@ -1419,6 +1420,7 @@ def get_winning_cats(matchup_stats_dataframe):
     move_column_inplace(matchup_stats_dataframe, CATS_COLUMNS, 0)
     return matchup_stats_dataframe
 
+@st.cache(allow_output_mutation=True, show_spinner=False)
 def get_live_matchup_stats_pipeline(team_dictionary):
     """
     Function pipelines the process involved in returning, for a specified team, its matchups
@@ -1519,12 +1521,118 @@ def get_team_names_from_matchup_week(week, team_dict):
     second_team_name = get_team_name_from_matchup(matchups, matchup_number, "1")
     return first_team_name, second_team_name
 
-# Force load in wide mode
-_max_width_()
+# Functions to get game count dataframe
+def get_team_name_list_from_player_name_list(player_name_list):
+    """
+
+    @param player_name_list:
+    @return:
+    """
+    team_name_list = list()
+    for player in player_name_list:
+        team = af.yahoo_player_team_and_jersey(player)[0]
+        team_name_list.append(team)
+    return player_name_list, team_name_list
+
+def daily_get_player_games(team_game_counts_series, player_name_list, team_name_list):
+    """
+
+    @param team_game_counts_series:
+    @param player_name_list:
+    @param team_name_list:
+    @return:
+    """
+    player_games_dictionary = dict()
+    team_game_counts_dataframe = pd.DataFrame(team_game_counts_series)
+    team_game_counts_dataframe.reset_index(inplace=True)
+    team_game_counts_dataframe = team_game_counts_dataframe.replace(NBA_NAME_LA_CLIPPERS,
+                                                                    YAHOO_NAME_LA_CLIPPERS)
+    for player, team in zip(player_name_list,team_name_list):
+        try:
+            player_games_dictionary[player] = \
+            team_game_counts_dataframe[team_game_counts_dataframe["index"] == team][0].iloc[0]
+        except IndexError:
+            player_games_dictionary[player] = 0
+    return player_games_dictionary
+
+def get_daily_game_count_list(filtered_games_week, player_name_list, team_name_list):
+
+    daily_game_count_list = list()
+    for day in list(filtered_games_week["gdte"].unique()):
+        daily_dataframe = filtered_games_week[filtered_games_week["gdte"] == day]
+        daily_team_game_counts = daily_dataframe[HOME_KEY].append(daily_dataframe[VISITORS_KEY])\
+            .value_counts()
+        player_games_dictionary = daily_get_player_games(daily_team_game_counts, player_name_list,
+                                                         team_name_list)
+        daily_game_count_list.append(sum(list(player_games_dictionary.values())))
+    cleaned_daily_game_count_list = [10 if i >= 10 else i for i in daily_game_count_list]
+    return daily_game_count_list, cleaned_daily_game_count_list
+
+def create_daily_game_count_dataframe(game_count_list, team_dict):
+        """
+
+        @param game_count_list:
+        @return:
+        """
+        matchup_daily_game_dataframe = pd.DataFrame()
+        matchup_daily_game_dataframe[team_dict[NAME_KEY]] = game_count_list
+        matchup_daily_game_dataframe = matchup_daily_game_dataframe.T
+        matchup_daily_game_dataframe.columns = DAILY_COLUMNS
+        return matchup_daily_game_dataframe
+
+def get_team_daily_game_count_dataframe_pipeline(team_dict, week="current"):
+    """
+
+    @param season_games_dataframe:
+    @param week:
+    @return:
+    """
+    season_games_dataframe = get_game_information_in_season(2020)
+    if week == "next":
+        fantasy_week, week_start_date, week_end_date = get_next_week_information()
+    elif week == "current":
+        fantasy_week, week_start_date, week_end_date = get_week_current_week_information()
+    else:
+        raise ValueError("Parameter 'week' must be 'current' or 'next'.")
+    filtered_games_week, team_game_counts = get_fantasy_week_games_dataframe\
+        (season_games_dataframe, week_start_date, week_end_date)
+    player_id_name_team_list, player_name_list = get_player_ids_names_in_fantasy_team(team_dict)
+    player_name_list, team_name_list = get_team_name_list_from_player_name_list(player_name_list)
+    daily_game_count_list, cleaned_daily_game_count_list = get_daily_game_count_list\
+        (filtered_games_week, player_name_list, team_name_list)
+    total_and_daily_games_list = [sum(cleaned_daily_game_count_list)] + \
+                             cleaned_daily_game_count_list
+    team_daily_game_dataframe = create_daily_game_count_dataframe(total_and_daily_games_list,
+                                                                     team_dict)
+    return team_daily_game_dataframe
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def get_matchup_daily_game_count_dataframe_pipeline(team1_dict, team2_dict, week="current"):
+    """
+
+    @param team1_dict:
+    @param team2_dict:
+    @param week:
+    @return:
+    """
+    team1_daily_game_dataframe = get_team_daily_game_count_dataframe_pipeline(team1_dict, week)
+    team2_daily_game_dataframe = get_team_daily_game_count_dataframe_pipeline(team2_dict, week)
+    matchup_daily_game_count_dataframe = team1_daily_game_dataframe.append\
+        (team2_daily_game_dataframe)
+    return matchup_daily_game_count_dataframe
+
+
+def highlight_cols(s):
+    color = 'red'
+    return 'background-color: %s' % color
+
+
+########################################## Streamlit App ###########################################
 
 # Streamlit App start
-# Header/Title
 
+# Force load in wide mode
+_max_width_()
 
 # Live standings
 team = st.sidebar.selectbox(
@@ -1552,6 +1660,15 @@ st.table(live_matchup_stats_dataframe.style.highlight_min(subset=["TOV"], color=
                                                           axis=0).highlight_max(subset=["CATS",
     "FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"], color='#f0f0f0', axis=0).format(
     STREAMLIT_LIVE_SCORES_TABLE_FORMAT))
+
+# Get dictionaries from name for matchup teams
+team1_dict = get_team_dict_from_team_name(team1_name)
+team2_dict = get_team_dict_from_team_name(team2_name)
+matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipeline(team1_dict,
+                                                                                     team2_dict,
+                                                                                     week="current")
+st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Total"],
+                                                                color='#f0f0f0', axis=0))
 
 # Get next week matchup/team/standings information
 next_fantasy_week = get_next_week_information()[0]
