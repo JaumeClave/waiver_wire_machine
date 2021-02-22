@@ -80,6 +80,10 @@ TEAM_STATS_KEY = "team_stats"
 STATS_KEY = "stats"
 STAT_KEY = "stat"
 VALUE_KEY = "value"
+RANK_KEY = "rank"
+CURRENT_COLUMN = "Current"
+NEW_COLUMN = "New"
+DIFFERENCE_COLUMN = "Difference"
 MATCHUP_COLUMNS = [af.PLAYER_COLUMN] + af.NINE_CAT_COLUMNS
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
@@ -503,8 +507,12 @@ def team_dataframe_column_float(roster_dataframe):
     @param roster_dataframe: roster dataframe with columns to convert
     @return: converted roster dataframe
     """
+
     for column in roster_dataframe.columns[1:]:
-        roster_dataframe[column] = roster_dataframe[column].astype(float)
+        try:
+            roster_dataframe[column] = roster_dataframe[column].astype(float)
+        except:
+            pass
     return roster_dataframe
 
 def power_ranking_change(league_averages_dataframe, team, new_team_9cat_averages):
@@ -1197,6 +1205,7 @@ def get_dataframe_from_live_matchup_stats(matchup_stats_dictionary, team_name):
     values = [team_name] + matchup_9cat_stats_list
     live_matchup_9cat_stats_dataframe = pd.DataFrame(values).T
     live_matchup_9cat_stats_dataframe.columns = MATCHUP_COLUMNS
+    live_matchup_9cat_stats_dataframe = live_matchup_9cat_stats_dataframe.replace("", 0)
     return live_matchup_9cat_stats_dataframe
 
 
@@ -1446,27 +1455,118 @@ def highlight_max(s):
     is_large = s.nlargest(1).values
     return ['font-weight: bold' if v in is_large else '' for v in s]
 
+
+def combine_current_new_differnce_dataframes_player_transaction(current_team_9cat_averages,
+                                                                new_team_9cat_averages,
+                                                                difference_team_9cat_averages):
+    """
+
+    @param current_team_9cat_averages:
+    @param new_team_9cat_averages:
+    @param difference_team_9cat_averages:
+    @return:
+    """
+    current_team_9cat_averages[""] = CURRENT_COLUMN
+    new_team_9cat_averages[""] = NEW_COLUMN
+    difference_team_9cat_averages[""] = DIFFERENCE_COLUMN
+    formatted_current_team_9cat_averages = current_team_9cat_averages.set_index("")
+    formatted_new_team_9cat_averages = new_team_9cat_averages.set_index("")
+    formatted_difference_team_9cat_averages = difference_team_9cat_averages.set_index("")
+    transaction_dataframe = pd.concat([formatted_current_team_9cat_averages,
+                                       formatted_new_team_9cat_averages,
+                                       formatted_difference_team_9cat_averages], axis=0)
+    return transaction_dataframe
+
+
+def get_teams_league_standing(team_name):
+    """
+    Function returns a teams current league standing
+    @param team_name: name of Yahoo Fantasy team
+    @return: current league standing
+    """
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    league_standings_dictionary = league.standings()
+    standing = "".join([x[RANK_KEY] for x in league_standings_dictionary if x[NAME_KEY] ==
+                        team_name])
+    return standing
+
+def format_team_standing_string(standing):
+    """
+    Function formats standing so it can be used in a sentence
+    @param standing: current league standing
+    @return: formatted standing
+    """
+    if standing == "1":
+        return standing + "st"
+    elif standing == "2":
+        return standing + "nd"
+    else:
+        return standing + "th"
+
+def get_team_names_from_matchup_week(week, team_dict):
+    """
+    Function returns both team names from a specified week and team name matchup
+    @param week: week number
+    @param team_dict: team information dictionary
+    @return: names of both teams in matchup
+    """
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    matchups = league.matchups(week=week)
+    matchup_number = get_teams_matchup_number(team_dict, matchups)
+    first_team_name = get_team_name_from_matchup(matchups, matchup_number, "0")
+    second_team_name = get_team_name_from_matchup(matchups, matchup_number, "1")
+    return first_team_name, second_team_name
+
 # Force load in wide mode
 _max_width_()
 
+# Streamlit App start
+# Header/Title
+
+
 # Live standings
-live_standings_team = st.selectbox(
+team = st.sidebar.selectbox(
      'Lebrontourage Teams',
      ("Select a Team", AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY],
       EL_LADRON_DE_CABRAS[NAME_KEY], LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY],
       MCCURRY[NAME_KEY], NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY],
       SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
-      YOBITCH_TOPPIN_ME[NAME_KEY]), 0, key="team2")
-if live_standings_team not in LEAGUE_TEAM_NAMES:
+      YOBITCH_TOPPIN_ME[NAME_KEY]), 7, key="team2")
+if team not in LEAGUE_TEAM_NAMES:
     st.warning('Select a team...')
     st.stop()
-live_standings_team_dict = get_team_dict_from_team_name(live_standings_team)
+live_standings_team_dict = get_team_dict_from_team_name(team)
 current_fantasy_week, team1_name, team1_live_stats, team2_name, team2_live_stats, \
     live_matchup_stats_dataframe = get_live_matchup_stats_pipeline(live_standings_team_dict)
-st.write("")
+team1_name_standing = get_teams_league_standing(team1_name)
+team2_name_standing = get_teams_league_standing(team2_name)
+
+#
+st.subheader('Matchup')
 st.write(f"The live scores for the week {current_fantasy_week} matchup between {team1_name} "
-         f"and {team2_name} are...")
-st.table(live_matchup_stats_dataframe.style.apply(highlight_max).format(STREAMLIT_LIVE_SCORES_TABLE_FORMAT))
+         f"({format_team_standing_string(team1_name_standing)}) and {team2_name} "
+         f"({format_team_standing_string(team2_name_standing)}) are...")
+st.table(live_matchup_stats_dataframe.style.highlight_min(subset=["TOV"], color='#f0f0f0',
+                                                          axis=0).highlight_max(subset=["CATS",
+    "FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"], color='#f0f0f0', axis=0).format(
+    STREAMLIT_LIVE_SCORES_TABLE_FORMAT))
+
+# Get next week matchup/team/standings information
+next_fantasy_week = get_next_week_information()[0]
+next_matchup_team1_name, next_matchup_team2_name = get_team_names_from_matchup_week(
+    next_fantasy_week, live_standings_team_dict)
+next_matchup_team1_name_standing = get_teams_league_standing(next_matchup_team1_name)
+next_matchup_team2_name_standing = get_teams_league_standing(next_matchup_team2_name)
+
+# Text about next week matchup/team/standings
+st.write("")
+st.write(f"The following week {next_fantasy_week} matchup is  between {next_matchup_team1_name} "
+         f"({format_team_standing_string(next_matchup_team1_name_standing)}) and"
+         f" {next_matchup_team2_name} "
+         f"({format_team_standing_string(next_matchup_team2_name_standing)}).")
+
 
 # Streamlit Code
 st.subheader('Free Agent Machine')
@@ -1479,64 +1579,54 @@ st.write("This feature simulates a FA transaction and calculates your teams 9Cat
 # st.write("Firstly, select your team. Secondly, select the player you want to drop. Thirdly, "
 #          "select the FA you want to add. Compare!")
 st.write("")
-
-# Sidebar select Team, Player to Drop and Player to Add
-team = st.sidebar.selectbox(
-     'Lebrontourage Teams',
-     ("Select a Team", AUTOPICK[NAME_KEY], CRABBEHERBYTHEPUSSY[NAME_KEY],
-      EL_LADRON_DE_CABRAS[NAME_KEY], LALALAND[NAME_KEY], MAGICS_JOHNSON[NAME_KEY],
-      MCCURRY[NAME_KEY], NUNN_OF_YALL_BETTA[NAME_KEY], RUSTY_CUNTBROOKS[NAME_KEY],
-      SWAGGY_P[NAME_KEY], TVONS_TIP_TOP_TEAM[NAME_KEY], WAKANDA_FOREVER[NAME_KEY],
-      YOBITCH_TOPPIN_ME[NAME_KEY]), 0)
-
-if team not in LEAGUE_TEAM_NAMES:
-    st.warning('Select a team...')
-    st.stop()
-
 # Reference variables
 team_dict = get_team_dict_from_team_name(team)
-
 # Load team dataframe
 with st.spinner(f"Getting {team} team information..."):
     team_9cat_stats = get_team_roster_stats_dataframe(team_dict)
 
+
+
+# Section title
+st.sidebar.write("")
+st.sidebar.write("Free Agent Machine")
 # Selected Team Players
 players = streamlit_return_players_on_team(team)
 player_drop_down = ["Select a Player"] + players
 player_to_drop = st.sidebar.selectbox(
      "Player to Drop", player_drop_down)
-if player_to_drop not in players:
-    st.warning('Select a player to drop...')
-    st.stop()
-
 # Free Agents
 free_agents = get_league_free_agents()
 fa_drop_down = ["Select a Player"] + free_agents
 player_to_add = st.sidebar.selectbox(
     "Player to Add", fa_drop_down)
-if player_to_add not in free_agents:
-    st.warning('Select a player to drop...')
-    st.stop()
-
 # Compute Transaction
-# if st.sidebar.button('Compare!'):
+# if st.sidebar.button('Simulate Transaction') and player_to_drop in players and player_to_add in \
+#         free_agents:
 with st.spinner(f"Simulating transaction. Dropping {player_to_drop} and adding {player_to_add}..."):
     current_players_9cat_averages, current_team_9cat_averages, new_players_9cat_averages, \
         new_team_9cat_averages, difference_team_9cat_averages = streamlit_waiver_add_and_drop(
             team_9cat_stats, player_to_drop, player_to_add)
+    # # st.write("Current Roster 9Cat Averages")
+    # st.table(current_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
+    # # st.write("New Roster 9Cat Averages")
+    # st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
+    # # st.write("9Cat Averages Roster Differences")
+    # st.table(difference_team_9cat_averages.style
+    transaction_dataframe = combine_current_new_differnce_dataframes_player_transaction(
+        current_team_9cat_averages, new_team_9cat_averages, difference_team_9cat_averages)
+    try:
+        transaction_dataframe.drop("TEAM", axis=1, inplace=True)
+    except:
+        pass
+    st.table(transaction_dataframe.style.applymap(
+        color_negative_red, subset=pd.IndexSlice["Difference",
+            ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
+        color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
+        STREAMLIT_TABLE_FORMAT))
 
-st.write("Current Roster 9Cat Averages")
-st.table(current_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
-st.write("New Roster 9Cat Averages")
-st.table(new_team_9cat_averages.style.format(STREAMLIT_TABLE_FORMAT))
 
-st.write("9Cat Averages Roster Differences")
-st.table(difference_team_9cat_averages.style.applymap(
-    color_negative_red, subset=pd.IndexSlice[:, ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST",
-                                                "STL", "BLK"]]).applymap(
-    color_negative_red_tov, subset=pd.IndexSlice[:, ["TOV"]]).
-         format(STREAMLIT_TABLE_FORMAT))
 
 # Add line break
 st.write("")
@@ -1554,9 +1644,9 @@ if st.button('Power Rankings'):
         league_power_rankings = power_rankings(league_averages_dataframe)
         league_power_rankings_index = get_overall_power_rank(league_power_rankings)
 
-
         ranking_change_dataframe = get_average_and_power_ranking_change(
             league_averages_dataframe, team_dict, new_team_9cat_averages)
+        ranking_change_dataframe = ranking_change_dataframe.iloc[:, :-1]
 
     st.table(league_averages_dataframe_index)
     st.write("The table below shows the leagues Power Rankings (PR). For each category, a team is "
