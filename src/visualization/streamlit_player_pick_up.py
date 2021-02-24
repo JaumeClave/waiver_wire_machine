@@ -2,6 +2,7 @@ import json
 import requests
 import pandas as pd
 import streamlit as st
+from datetime import date
 from yahoo_oauth import OAuth2
 import yahoo_fantasy_api as yfa
 from src.data import player_9cat_average as p9ca
@@ -84,7 +85,7 @@ RANK_KEY = "rank"
 CURRENT_COLUMN = "Current"
 NEW_COLUMN = "New"
 DIFFERENCE_COLUMN = "Difference"
-DAILY_COLUMNS = ["Total", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+DAILY_COLUMNS = ["Total", "Playable", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 MATCHUP_COLUMNS = [af.PLAYER_COLUMN] + af.NINE_CAT_COLUMNS
 THREE_DECIMAL_COLUMNS = [FIELD_GOAL_PERCENTAGE_COLUMN, FREE_THROW_PERCENTAGE_COLUMN]
 ONE_DECIMAL_COLUMNS = [THREES_MADE_COLUMN, POINTS_COLUMN, REBOUNDS_COLUMN, ASSITS_COLUMN,
@@ -1522,6 +1523,7 @@ def get_team_names_from_matchup_week(week, team_dict):
     return first_team_name, second_team_name
 
 # Functions to get game count dataframe
+@st.cache(allow_output_mutation=True, show_spinner=False)
 def get_team_name_list_from_player_name_list(player_name_list):
     """
 
@@ -1530,8 +1532,16 @@ def get_team_name_list_from_player_name_list(player_name_list):
     """
     team_name_list = list()
     for player in player_name_list:
-        team = af.yahoo_player_team_and_jersey(player)[0]
-        team_name_list.append(team)
+        try:
+            team = af.yahoo_player_team_and_jersey(player)[0]
+            team_name_list.append(team)
+        except RuntimeError:
+            common_all_players = commonallplayers.CommonAllPlayers(is_only_current_season=1)
+            common_all_players_dict = common_all_players.get_normalized_dict()[COMMON_ALL_PLAYERS]
+            team = "".join([player["TEAM_CITY"] + " " + player["TEAM_NAME"] for player in
+                                   common_all_players_dict if player[DISPLAY_FIRST_LAST] ==
+                                   "Royce O'Neale"])
+            team_name_list.append(team)
     return player_name_list, team_name_list
 
 def daily_get_player_games(team_game_counts_series, player_name_list, team_name_list):
@@ -1580,6 +1590,7 @@ def create_daily_game_count_dataframe(game_count_list, team_dict):
         matchup_daily_game_dataframe.columns = DAILY_COLUMNS
         return matchup_daily_game_dataframe
 
+@st.cache(allow_output_mutation=True, show_spinner=False)
 def get_team_daily_game_count_dataframe_pipeline(team_dict, week="current"):
     """
 
@@ -1600,8 +1611,10 @@ def get_team_daily_game_count_dataframe_pipeline(team_dict, week="current"):
     player_name_list, team_name_list = get_team_name_list_from_player_name_list(player_name_list)
     daily_game_count_list, cleaned_daily_game_count_list = get_daily_game_count_list\
         (filtered_games_week, player_name_list, team_name_list)
-    total_and_daily_games_list = [sum(cleaned_daily_game_count_list)] + \
-                             cleaned_daily_game_count_list
+    total_and_daily_games_list = [sum(daily_game_count_list)] + [sum(
+        cleaned_daily_game_count_list)] + cleaned_daily_game_count_list
+    while len(total_and_daily_games_list) < 9:
+        total_and_daily_games_list = total_and_daily_games_list + [0]
     team_daily_game_dataframe = create_daily_game_count_dataframe(total_and_daily_games_list,
                                                                      team_dict)
     return team_daily_game_dataframe
@@ -1623,8 +1636,38 @@ def get_matchup_daily_game_count_dataframe_pipeline(team1_dict, team2_dict, week
 
 
 def highlight_cols(s):
-    color = 'red'
+    color = '#f9f9f9'
     return 'background-color: %s' % color
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def get_two_league_team_comparison_dataframe(team1_dict, team2_dict):
+    """
+
+    @param team1_dict:
+    @param team2_dict:
+    @return:
+    """
+    if team1_dict[NAME_KEY] == NUNN_OF_YALL_BETTA[NAME_KEY]:
+        team1_dict = NUNN_OF_YALL_BETTA
+        team2_dict = team2_dict
+    else:
+        team1_dict = NUNN_OF_YALL_BETTA
+        team2_dict = team1_dict
+    matchup_comaprison_dataframe = pd.DataFrame()
+    sc = yahoo_fantasy_api_authentication()
+    league = yahoo_fantasy_league(sc)
+    team1_dataframe = player_to_team_mean_stats(team1_dict, league)
+    matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(team1_dataframe)
+    team2_dataframe = player_to_team_mean_stats(team2_dict, league)
+    matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(team2_dataframe)
+    team1_less_name_floats_dataframe = remove_player_and_float_convert(team1_dataframe.iloc[:,1:])
+    team2_less_name_floats_dataframe = remove_player_and_float_convert(team2_dataframe.iloc[:,1:])
+    difference_dataframe = team1_less_name_floats_dataframe.subtract(team2_less_name_floats_dataframe)
+    difference_dataframe[TEAM_COLUMN] = DIFFERENCE_COLUMN
+    matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(difference_dataframe)
+    matchup_comaprison_dataframe = matchup_comaprison_dataframe.set_index(TEAM_COLUMN)
+    matchup_comaprison_dataframe = remove_player_and_float_convert(matchup_comaprison_dataframe)
+    return matchup_comaprison_dataframe, team1_dataframe, team2_dataframe
 
 
 ########################################## Streamlit App ###########################################
@@ -1651,29 +1694,54 @@ current_fantasy_week, team1_name, team1_live_stats, team2_name, team2_live_stats
 team1_name_standing = get_teams_league_standing(team1_name)
 team2_name_standing = get_teams_league_standing(team2_name)
 
-#
-st.subheader('Matchup')
+# Current/Live matchup
+st.subheader('Live Matchup')
 st.write(f"The live scores for the week {current_fantasy_week} matchup between {team1_name} "
          f"({format_team_standing_string(team1_name_standing)}) and {team2_name} "
          f"({format_team_standing_string(team2_name_standing)}) are...")
-st.table(live_matchup_stats_dataframe.style.highlight_min(subset=["TOV"], color='#f0f0f0',
+st.table(live_matchup_stats_dataframe.style.highlight_min(subset=["TOV"], color='#f9f9f9',
                                                           axis=0).highlight_max(subset=["CATS",
-    "FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"], color='#f0f0f0', axis=0).format(
+    "FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"], color='#f9f9f9', axis=0).format(
     STREAMLIT_LIVE_SCORES_TABLE_FORMAT))
 
 # Get dictionaries from name for matchup teams
 team1_dict = get_team_dict_from_team_name(team1_name)
 team2_dict = get_team_dict_from_team_name(team2_name)
+
+# Calculate matchup season average 9cat stats dataframes
+st.write("Season average 9CAT stats for both teams are...")
+matchup_comaprison_dataframe, team1_dataframe, team2_dataframe = \
+    get_two_league_team_comparison_dataframe(team1_dict, team2_dict)
+st.table(matchup_comaprison_dataframe.style.applymap(color_negative_red, subset=pd.IndexSlice[
+    "Difference", ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
+    color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
+    STREAMLIT_TABLE_FORMAT))
+
+# Get matchup daily game count dataframe
 matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipeline(team1_dict,
                                                                                      team2_dict,
                                                                                      week="current")
-st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Total"],
-                                                                color='#f0f0f0', axis=0))
+
+# Calculate day and format abbreviated weekday name
+today = date.today()
+today_string = today.strftime("%a")
+st.write("The advanced game calendar for both teams is...")
+st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
+                                                                color='#f9f9f9',
+                                                                axis=0).applymap(highlight_cols,
+                                                                                 subset=pd.IndexSlice[:, [today_string]]))
+
+# Next weeks matchup
+st.subheader('Next Matchup')
 
 # Get next week matchup/team/standings information
 next_fantasy_week = get_next_week_information()[0]
 next_matchup_team1_name, next_matchup_team2_name = get_team_names_from_matchup_week(
     next_fantasy_week, live_standings_team_dict)
+
+# Get dictionaries from name for matchup teams
+next_matchup_team1_dict = get_team_dict_from_team_name(next_matchup_team1_name)
+next_matchup_team2_dict = get_team_dict_from_team_name(next_matchup_team2_name)
 next_matchup_team1_name_standing = get_teams_league_standing(next_matchup_team1_name)
 next_matchup_team2_name_standing = get_teams_league_standing(next_matchup_team2_name)
 
@@ -1683,6 +1751,22 @@ st.write(f"The following week {next_fantasy_week} matchup is  between {next_matc
          f"({format_team_standing_string(next_matchup_team1_name_standing)}) and"
          f" {next_matchup_team2_name} "
          f"({format_team_standing_string(next_matchup_team2_name_standing)}).")
+
+# Calculate next week matchup season average 9cat stats dataframes
+matchup_comaprison_dataframe, team1_dataframe, team2_dataframe = \
+    get_two_league_team_comparison_dataframe(next_matchup_team1_dict, next_matchup_team2_dict)
+st.table(matchup_comaprison_dataframe.style.applymap(color_negative_red, subset=pd.IndexSlice[
+    "Difference", ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
+    color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
+    STREAMLIT_TABLE_FORMAT))
+
+# Get matchup daily game count dataframe
+next_matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipeline(
+    next_matchup_team1_dict, next_matchup_team2_dict, week="next")
+st.write("The advanced game calendar for both teams is...")
+st.table(next_matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
+                                                                color='#f9f9f9',
+                                                                axis=0))
 
 
 # Streamlit Code
@@ -1741,8 +1825,6 @@ with st.spinner(f"Simulating transaction. Dropping {player_to_drop} and adding {
             ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
         color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
         STREAMLIT_TABLE_FORMAT))
-
-
 
 
 # Add line break
