@@ -1272,6 +1272,7 @@ def get_matchup_teams_9cat_stat_dataframes(week, team_dict):
     return first_team_name, first_team_stats_dataframe, second_team_name, \
            second_team_stats_dataframe, matchup_stats_dataframe
 
+
 def get_team_predicted_stats_dataframe(team_name, schedule_dataframe, week_start_date,
                                        week_end_date):
     """
@@ -1297,6 +1298,7 @@ def get_team_predicted_stats_dataframe(team_name, schedule_dataframe, week_start
                                                                 team_9cat_average_stats_dataframe)
     return predicted_stats_dataframe, team_dictionary
 
+
 def get_clean_predicted_stats_dataframe(predicted_stats_dataframe, team_dict):
     """
     Function cleans the predicted stats dataframe by creating a total row and adding the name of
@@ -1311,6 +1313,7 @@ def get_clean_predicted_stats_dataframe(predicted_stats_dataframe, team_dict):
     total_row_predicted_stats_datafame, total_row_predicted_stats_datafame_no_name = \
         get_filtered_total_row(dataframe_with_total, team_dict)
     return total_row_predicted_stats_datafame, total_row_predicted_stats_datafame_no_name
+
 
 def add_live_stats_and_predicted_dataframes(live_stats_dataframe,
                                             total_row_predicted_stats_datafame, team_name):
@@ -1334,6 +1337,7 @@ def add_live_stats_and_predicted_dataframes(live_stats_dataframe,
                                                 live_plus_prediction_dataframe])
     live_plus_prediction_dataframe[PLAYER_COLUMN] = team_name
     return live_plus_prediction_dataframe
+
 
 @st.cache(allow_output_mutation=True, show_spinner=False)
 def live_plus_prediction_matchup_dataframe(schedule_dataframe, team_name, current_date,
@@ -1390,9 +1394,11 @@ def get_team_dict_from_team_name(team_name):
         team_dict = af.YOBITCH_TOPPIN_ME
     return team_dict
 
+
 def move_column_inplace(df, col, pos):
     col = df.pop(col)
     df.insert(pos, col.name, col)
+
 
 def get_winning_cats(matchup_stats_dataframe):
     """
@@ -1420,6 +1426,7 @@ def get_winning_cats(matchup_stats_dataframe):
     matchup_stats_dataframe[CATS_COLUMNS] = team_stat_win_list
     move_column_inplace(matchup_stats_dataframe, CATS_COLUMNS, 0)
     return matchup_stats_dataframe
+
 
 @st.cache(allow_output_mutation=True, show_spinner=False)
 def get_live_matchup_stats_pipeline(team_dictionary):
@@ -1494,6 +1501,7 @@ def get_teams_league_standing(team_name):
                         team_name])
     return standing
 
+
 def format_team_standing_string(standing):
     """
     Function formats standing so it can be used in a sentence
@@ -1506,6 +1514,7 @@ def format_team_standing_string(standing):
         return standing + "nd"
     else:
         return standing + "th"
+
 
 def get_team_names_from_matchup_week(week, team_dict):
     """
@@ -1544,6 +1553,7 @@ def get_team_name_list_from_player_name_list(player_name_list):
             team_name_list.append(team)
     return player_name_list, team_name_list
 
+
 def daily_get_player_games(team_game_counts_series, player_name_list, team_name_list):
     """
 
@@ -1565,6 +1575,7 @@ def daily_get_player_games(team_game_counts_series, player_name_list, team_name_
             player_games_dictionary[player] = 0
     return player_games_dictionary
 
+
 def get_daily_game_count_list(filtered_games_week, player_name_list, team_name_list):
 
     daily_game_count_list = list()
@@ -1578,7 +1589,23 @@ def get_daily_game_count_list(filtered_games_week, player_name_list, team_name_l
     cleaned_daily_game_count_list = [10 if i >= 10 else i for i in daily_game_count_list]
     return daily_game_count_list, cleaned_daily_game_count_list
 
-def create_daily_game_count_dataframe(game_count_list, team_dict):
+
+def get_matchup_days_as_column_names(filtered_games_week):
+    """
+
+    @param filtered_games_week:
+    @return:
+    """
+    matchup_column_names = list()
+    matchup_column_names.append("Total")
+    matchup_column_names.append("Playable")
+    for date in list(filtered_games_week[GDATE_KEY].unique()):
+        date_format = pd.to_datetime(str(date))
+        matchup_column_names.append(date_format.strftime("%a"))
+    return matchup_column_names
+
+
+def create_daily_game_count_dataframe(game_count_list, team_dict, matchup_column_names):
         """
 
         @param game_count_list:
@@ -1587,10 +1614,9 @@ def create_daily_game_count_dataframe(game_count_list, team_dict):
         matchup_daily_game_dataframe = pd.DataFrame()
         matchup_daily_game_dataframe[team_dict[NAME_KEY]] = game_count_list
         matchup_daily_game_dataframe = matchup_daily_game_dataframe.T
-        matchup_daily_game_dataframe.columns = DAILY_COLUMNS
+        matchup_daily_game_dataframe.columns = matchup_column_names
         return matchup_daily_game_dataframe
 
-@st.cache(allow_output_mutation=True, show_spinner=False)
 def get_team_daily_game_count_dataframe_pipeline(team_dict, week="current"):
     """
 
@@ -1611,13 +1637,13 @@ def get_team_daily_game_count_dataframe_pipeline(team_dict, week="current"):
     player_name_list, team_name_list = get_team_name_list_from_player_name_list(player_name_list)
     daily_game_count_list, cleaned_daily_game_count_list = get_daily_game_count_list\
         (filtered_games_week, player_name_list, team_name_list)
-    total_and_daily_games_list = [sum(daily_game_count_list)] + [sum(
-        cleaned_daily_game_count_list)] + cleaned_daily_game_count_list
-    while len(total_and_daily_games_list) < 9:
-        total_and_daily_games_list = total_and_daily_games_list + [0]
+    total_and_daily_games_list = [sum(daily_game_count_list)] + [sum(cleaned_daily_game_count_list)]\
+                                 + cleaned_daily_game_count_list
+    matchup_column_names = get_matchup_days_as_column_names(filtered_games_week)
     team_daily_game_dataframe = create_daily_game_count_dataframe(total_and_daily_games_list,
-                                                                     team_dict)
+                                                                  team_dict, matchup_column_names)
     return team_daily_game_dataframe
+
 
 @st.cache(allow_output_mutation=True, show_spinner=False)
 def get_matchup_daily_game_count_dataframe_pipeline(team1_dict, team2_dict, week="current"):
@@ -1668,6 +1694,54 @@ def get_two_league_team_comparison_dataframe(team1_dict, team2_dict):
     matchup_comaprison_dataframe = matchup_comaprison_dataframe.set_index(TEAM_COLUMN)
     matchup_comaprison_dataframe = remove_player_and_float_convert(matchup_comaprison_dataframe)
     return matchup_comaprison_dataframe, team1_dataframe, team2_dataframe
+
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def get_nba_team_playing_games_in_week(filtered_games_week):
+    """
+    Function finds, for each day in the week, which NBA teams play a game that day.
+    @param filtered_games_week:
+    @return:
+    """
+    team_weekly_games_dataframe = pd.DataFrame()
+    for day in list(filtered_games_week["gdte"].unique()):
+        date_format = pd.to_datetime(str(day))
+        date_format = date_format.strftime("%a")
+        daily_dataframe = filtered_games_week[filtered_games_week["gdte"] == day]
+        daily_team_game_counts = daily_dataframe[HOME_KEY].append(daily_dataframe[VISITORS_KEY]) \
+            .value_counts()
+        daily_team_game_counts_dataframe = pd.DataFrame(daily_team_game_counts,
+                                                        columns=[date_format])
+        team_weekly_games_dataframe = pd.concat([team_weekly_games_dataframe,
+                                                 daily_team_game_counts_dataframe], axis=1)
+    team_weekly_games_dataframe = team_weekly_games_dataframe.fillna(0)
+    team_weekly_games_dataframe.drop("Team Durant", inplace=True)
+    team_weekly_games_dataframe.drop("Team LeBron", inplace=True)
+    team_weekly_games_dataframe.astype(int)
+    team_weekly_games_dataframe["Total"] = team_weekly_games_dataframe.sum(axis=1)
+    team_weekly_games_dataframe.sort_index(inplace=True)
+    move_column_inplace(team_weekly_games_dataframe, "Total", 0)
+    return team_weekly_games_dataframe
+
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def get_nba_team_playing_games_in_week_pipeline(week="current"):
+    """
+
+    @param week:
+    @return:
+    """
+    season_games_dataframe = get_game_information_in_season(2020)
+    if week == "next":
+        fantasy_week, week_start_date, week_end_date = get_next_week_information()
+    elif week == "current":
+        fantasy_week, week_start_date, week_end_date = get_week_current_week_information()
+    else:
+        raise ValueError("Parameter 'week' must be 'current' or 'next'.")
+    filtered_games_week, team_game_counts = get_fantasy_week_games_dataframe \
+        (season_games_dataframe, week_start_date, week_end_date)
+    team_weekly_games_dataframe = get_nba_team_playing_games_in_week(filtered_games_week)
+    return team_weekly_games_dataframe
 
 
 ########################################## Streamlit App ###########################################
@@ -1726,10 +1800,14 @@ matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipe
 today = date.today()
 today_string = today.strftime("%a")
 st.write("The advanced game calendar for both teams is...")
-st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
-                                                                color='#f9f9f9',
-                                                                axis=0).applymap(highlight_cols,
-                                                                                 subset=pd.IndexSlice[:, [today_string]]))
+try:
+    st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
+                                                                    color='#f9f9f9',
+                                                                    axis=0).applymap(
+        highlight_cols, ubset=pd.IndexSlice[:, [today_string]]))
+except ValueError:
+    st.table(matchup_daily_game_count_dataframe)
+
 
 # Next weeks matchup
 st.subheader('Next Matchup')
@@ -1752,21 +1830,28 @@ st.write(f"The following week {next_fantasy_week} matchup is  between {next_matc
          f" {next_matchup_team2_name} "
          f"({format_team_standing_string(next_matchup_team2_name_standing)}).")
 
-# Calculate next week matchup season average 9cat stats dataframes
-matchup_comaprison_dataframe, team1_dataframe, team2_dataframe = \
-    get_two_league_team_comparison_dataframe(next_matchup_team1_dict, next_matchup_team2_dict)
-st.table(matchup_comaprison_dataframe.style.applymap(color_negative_red, subset=pd.IndexSlice[
-    "Difference", ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
-    color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
-    STREAMLIT_TABLE_FORMAT))
+# Checkbox next week matchup
+query_next_week_matchup = st.button("Analyse Mactchup!")
+if query_next_week_matchup:
 
-# Get matchup daily game count dataframe
-next_matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipeline(
-    next_matchup_team1_dict, next_matchup_team2_dict, week="next")
-st.write("The advanced game calendar for both teams is...")
-st.table(next_matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
-                                                                color='#f9f9f9',
-                                                                axis=0))
+    # Calculate next week matchup season average 9cat stats dataframes
+    matchup_comaprison_dataframe, team1_dataframe, team2_dataframe = \
+        get_two_league_team_comparison_dataframe(next_matchup_team1_dict, next_matchup_team2_dict)
+    st.table(matchup_comaprison_dataframe.style.applymap(color_negative_red, subset=pd.IndexSlice[
+        "Difference", ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
+        color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
+        STREAMLIT_TABLE_FORMAT))
+
+    # Get matchup daily game count dataframe
+    next_matchup_daily_game_count_dataframe = get_matchup_daily_game_count_dataframe_pipeline(
+        next_matchup_team1_dict, next_matchup_team2_dict, week="next")
+    st.write("The advanced game calendar for both teams is...")
+    try:
+        st.table(next_matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
+                                                                        color='#f9f9f9',
+                                                                        axis=0))
+    except ValueError:
+        st.table(next_matchup_daily_game_count_dataframe)
 
 
 # Streamlit Code
@@ -1780,6 +1865,8 @@ st.write("This feature simulates a FA transaction and calculates your teams 9Cat
 # st.write("Firstly, select your team. Secondly, select the player you want to drop. Thirdly, "
 #          "select the FA you want to add. Compare!")
 st.write("")
+team_weekly_games_dataframe = get_nba_team_playing_games_in_week_pipeline(week="current")
+st.dataframe(team_weekly_games_dataframe, 1200, 400)
 # Reference variables
 team_dict = get_team_dict_from_team_name(team)
 # Load team dataframe
