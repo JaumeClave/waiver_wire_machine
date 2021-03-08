@@ -318,6 +318,8 @@ def yahoo_player_team_and_jersey(player_name):
     """
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
+    if "'" in player_name:
+        player_name = player_name.split("'")[-1]
     player_details_dictionary = league.player_details(player_name)
     players_team = player_details_dictionary[0][EDITORIAL_TEAM_FULL_NAME]
     players_number = player_details_dictionary[0][UNIFORM_NUMBER]
