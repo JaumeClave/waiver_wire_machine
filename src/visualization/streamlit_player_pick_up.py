@@ -1,5 +1,6 @@
 import json
 import requests
+import numpy as np
 import pandas as pd
 import streamlit as st
 from datetime import date
@@ -289,7 +290,7 @@ def player_to_team_mean_stats(team_dictionary, league):
     """
     roster_dataframe = team_9cat_average_stats(team_dictionary, league)
     team_mean_dataframe = fantasy_team_mean_stats(roster_dataframe, team_dictionary)
-    return team_mean_dataframe
+    return team_mean_dataframe, roster_dataframe
 
 @st.cache(show_spinner=False)
 def league_averages(league_team_list):
@@ -305,7 +306,7 @@ def league_averages(league_team_list):
         sc = yahoo_fantasy_api_authentication()
         league = yahoo_fantasy_league(sc)
         league_averages_dataframe = league_averages_dataframe.append(player_to_team_mean_stats
-                                                                     (team, league))
+                                                                     (team, league)[0])
     league_averages_dataframe.reset_index(drop=True, inplace=True)
     return league_averages_dataframe
 
@@ -1030,6 +1031,29 @@ def get_player_games(team_game_counts_series, player_name_list):
             team_game_counts_dataframe[team_game_counts_dataframe[INDEX_COLUMN] == team][0].iloc[0]
     return player_games_dictionary
 
+
+def get_team_player_game_dataframe(team_dict, week="next", season=2020):
+    """
+
+    @param team_dict:
+    @param week:
+    @param season:
+    @return:
+    """
+    if week == "next":
+        fantasy_week, week_start_date, week_end_date = get_next_week_information()
+    elif week == "current":
+        fantasy_week, week_start_date, week_end_date = get_week_current_week_information()
+    else:
+        raise ValueError("Parameter 'week' must be 'current' or 'next'.")
+    season_games_dataframe = get_game_information_in_season(season) # Run once only
+    filtered_games_week, team_game_counts = get_fantasy_week_games_dataframe\
+        (season_games_dataframe, week_start_date, week_end_date)
+    player_id_name_team_list, player_name_list = get_player_ids_names_in_fantasy_team(team_dict)
+    player_games_dictionary = get_player_games(team_game_counts, player_name_list)
+    return filtered_games_week, player_games_dictionary
+
+
 def get_predicted_player_weekly_9cat(player_games_dictionary, team_9cat_average_stats):
     """
     Function is used to create a dataframe which contains predicted totals for a week of Yahoo
@@ -1684,9 +1708,9 @@ def get_two_league_team_comparison_dataframe(team1_dict, team2_dict):
     matchup_comaprison_dataframe = pd.DataFrame()
     sc = yahoo_fantasy_api_authentication()
     league = yahoo_fantasy_league(sc)
-    team1_dataframe = player_to_team_mean_stats(team1_dict, league)
+    team1_dataframe, team1_9cat_roster_dataframe = player_to_team_mean_stats(team1_dict, league)
     matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(team1_dataframe)
-    team2_dataframe = player_to_team_mean_stats(team2_dict, league)
+    team2_dataframe, team2_9cat_roster_dataframe = player_to_team_mean_stats(team2_dict, league)
     matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(team2_dataframe)
     team1_less_name_floats_dataframe = remove_player_and_float_convert(team1_dataframe.iloc[:,1:])
     team2_less_name_floats_dataframe = remove_player_and_float_convert(team2_dataframe.iloc[:,1:])
@@ -1695,7 +1719,8 @@ def get_two_league_team_comparison_dataframe(team1_dict, team2_dict):
     matchup_comaprison_dataframe = matchup_comaprison_dataframe.append(difference_dataframe)
     matchup_comaprison_dataframe = matchup_comaprison_dataframe.set_index(TEAM_COLUMN)
     matchup_comaprison_dataframe = remove_player_and_float_convert(matchup_comaprison_dataframe)
-    return matchup_comaprison_dataframe, team1_dataframe, team2_dataframe
+    return matchup_comaprison_dataframe, team1_dataframe, team2_dataframe, \
+           team1_9cat_roster_dataframe, team2_9cat_roster_dataframe
 
 
 @st.cache(allow_output_mutation=True, show_spinner=False)
@@ -1746,6 +1771,151 @@ def get_nba_team_playing_games_in_week_pipeline(week="current"):
     return team_weekly_games_dataframe
 
 
+STATUS_TO_REMOVE = ["INJ", "O", "NA"]
+NAME_LOWER_COLUMN = "name"
+STATUS_LOWER_COLUMN = "status"
+gaussian_stats = ['FG_PCT', 'FT_PCT']
+poison_stats = ['FG3M', 'PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV']
+
+
+def make_player_status_dataframe(team_dict):
+    """
+
+    @param team_dict:
+    @return:
+    """
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    tm = league.to_team(team_dict[TEAM_KEY])
+    roster = tm.roster()
+    required_fields = [NAME_LOWER_COLUMN, STATUS_LOWER_COLUMN]
+    player_name_list = list()
+    player_status_list = list()
+    player_status_dataframe = pd.DataFrame(columns=[PLAYER_COLUMN, STATUS_LOWER_COLUMN])
+    for n in range(len(roster)):
+        player_status_dict = {key:value for key, value in roster[n].items() if key in required_fields}
+        player_name_list.append(player_status_dict[NAME_LOWER_COLUMN])
+        player_status_list.append(player_status_dict[STATUS_LOWER_COLUMN])
+    player_status_dataframe[PLAYER_COLUMN] = player_name_list
+    player_status_dataframe[STATUS_LOWER_COLUMN] = player_status_list
+    return player_status_dataframe
+
+
+def make_filtered_status_dataframe(team_9cat_average_df, player_status_df):
+    """
+
+    @param team_9cat_average_df:
+    @param player_status_df:
+    @return:
+    """
+    merged_df = team_9cat_average_df.merge(player_status_df, on=PLAYER_COLUMN)
+    filtered_status_df = merged_df[~merged_df[STATUS_LOWER_COLUMN].isin(STATUS_TO_REMOVE)].drop\
+        (STATUS_LOWER_COLUMN, axis=1)
+    return filtered_status_df
+
+
+def make_simulation_dataset(team_dict, team_9cat_roster_dataframe=None, week="current",
+                            include_injured=False):
+    """
+
+    @param team_dict:
+    @param week:
+    @param include_injured:
+    @return:
+    """
+    sc = af.yahoo_fantasy_api_authentication()
+    league = af.yahoo_fantasy_league(sc)
+    if team_9cat_roster_dataframe is None:
+        team_9cat_averages = af.team_9cat_average_stats(team_dict, league)
+    else:
+        team_9cat_averages = team_9cat_roster_dataframe
+    try:
+        team_9cat_averages.drop("mean", inplace=True)
+    except KeyError:
+        pass
+    filtered_games_week, player_games_dictionary = get_team_player_game_dataframe(team_dict,
+                                                                                  week=week,
+                                                                                  season=2020)
+    player_games = pd.DataFrame.from_dict(player_games_dictionary, orient="index")
+    player_games = player_games.loc[player_games.index.repeat(player_games[0])]
+    player_games.reset_index(inplace=True)
+    player_games.columns = [["PLAYER", "G"]]
+    team_9cat_averages.to_clipboard(index=False)
+    team_9cat_averages=pd.read_clipboard(sep='\t')
+    player_games.to_clipboard(index=False)
+    player_games=pd.read_clipboard(sep='\t')
+    simulation_dataset = pd.merge(team_9cat_averages, player_games, on=["PLAYER"])
+    if include_injured is False:
+        player_status_df = make_player_status_dataframe(team_dict)
+        simulation_dataset = make_filtered_status_dataframe(simulation_dataset, player_status_df)
+    simulation_dataset.drop(["PLAYER", "G"], axis=1, inplace=True)
+    simulation_dataset.fillna(simulation_dataset.mean(), inplace=True)
+    simulation_dataset = simulation_dataset.apply(pd.to_numeric)
+    return simulation_dataset
+
+
+def simulate_stats(team_df, n_reps):
+
+    pois_stats = team_df.loc[:, poison_stats].values
+    gaus_stats = team_df.loc[:, gaussian_stats].values
+    pois = np.random.poisson(lam=pois_stats,
+                             size=(n_reps, *pois_stats.shape))
+    pois = np.maximum(0, pois)
+    gaus = np.random.normal(loc=gaus_stats, scale=0.2 * gaus_stats,
+                            size=(n_reps, *gaus_stats.shape))
+    gaus = np.clip(gaus, 0, 1)
+
+    aggr_pois_stats = pois.sum(axis=1)
+    aggr_gaus_stats = gaus.mean(axis=1)
+    aggr_stats = np.concatenate((aggr_gaus_stats, aggr_pois_stats),
+                                axis=1)
+    return aggr_stats
+
+@st.cache(allow_output_mutation=True, show_spinner=False)
+def matchup_simulation(team1_dict, team2_dict, team1_9cat_roster_dataframe=None,
+                       team2_9cat_roster_dataframe=None, n_reps=100000, week="current",
+                       include_injured=False):
+    """
+
+    @param team1_dict:
+    @param team2_dict:
+    @param n_reps:
+    @param week:
+    @param include_injured:
+    @return:
+    """
+    team1_simulation_dataset = make_simulation_dataset(team1_dict,
+                                                       team_9cat_roster_dataframe=team1_9cat_roster_dataframe,
+                                                       week=week, include_injured=include_injured)
+    team2_simulation_dataset = make_simulation_dataset(team2_dict,
+                                                       team_9cat_roster_dataframe=team2_9cat_roster_dataframe,
+                                                       week=week,
+                                                       include_injured=include_injured)
+    team1_sim_stats = simulate_stats(team1_simulation_dataset, n_reps)
+    team2_sim_stats = simulate_stats(team2_simulation_dataset, n_reps)
+    perc_win = ((team1_sim_stats > team2_sim_stats).sum(axis=0)
+                / n_reps * 100)
+    perc_win_df = pd.DataFrame(perc_win,
+                               index=gaussian_stats + poison_stats,
+                               columns=['WinProb'])
+    perc_win_df.loc['TOV'] = 100 - perc_win_df.loc['TOV']
+    simulated_cats = perc_win_df.T
+    other_team = abs(simulated_cats.subtract(100))
+    total_df = simulated_cats.append(other_team)
+    total_df[""] = [team1_dict["name"], team2_dict["name"]]
+    total_df.set_index("", inplace=True)
+    count = 0
+    count2 = 0
+    for value, value2 in zip(list(simulated_cats.values[0]), list(other_team.values[0])):
+        if float(value) > 50:
+            count += 1
+        if float(value2) > 50:
+            count2 += 1
+    total_df['CATS'] = [count, count2]
+    move_column_inplace(total_df, 'CATS', 0)
+    return total_df
+
+
 ########################################## Streamlit App ###########################################
 
 # Streamlit App start
@@ -1786,8 +1956,8 @@ team2_dict = get_team_dict_from_team_name(team2_name)
 
 # Calculate matchup season average 9cat stats dataframes
 st.write("Season average 9CAT stats for both teams are...")
-matchup_comaprison_dataframe, team1_dataframe, team2_dataframe = \
-    get_two_league_team_comparison_dataframe(team1_dict, team2_dict)
+matchup_comaprison_dataframe, team1_dataframe, team2_dataframe, team1_9cat_roster_dataframe, \
+    team2_9cat_roster_dataframe = get_two_league_team_comparison_dataframe(team1_dict, team2_dict)
 st.table(matchup_comaprison_dataframe.style.applymap(color_negative_red, subset=pd.IndexSlice[
     "Difference", ["FG_PCT", "FT_PCT", "FG3M", "PTS", "REB", "AST", "STL", "BLK"]]).applymap(
     color_negative_red_tov, subset=pd.IndexSlice["Difference", ["TOV"]]).format(
@@ -1806,9 +1976,24 @@ try:
     st.table(matchup_daily_game_count_dataframe.style.highlight_max(subset=["Playable"],
                                                                     color='#f9f9f9',
                                                                     axis=0).applymap(
-        highlight_cols, ubset=pd.IndexSlice[:, [today_string]]))
+        highlight_cols, subset=pd.IndexSlice[:, [today_string]]))
 except ValueError:
     st.table(matchup_daily_game_count_dataframe)
+
+
+if team1_dict == af.NUNN_OF_YALL_BETTA:
+    team2_dict = team2_dict
+else:
+    team2_dict = team1_dict
+    team1_dict = team2_dict
+
+simulated_cats = matchup_simulation(team1_dict, team2_dict,
+                                    team1_9cat_roster_dataframe=team1_9cat_roster_dataframe,
+                       team2_9cat_roster_dataframe=team2_9cat_roster_dataframe, n_reps=100000,
+                                    week="current", include_injured=False)
+
+st.table(simulated_cats.applymap(np.int64).astype(str) + '%')
+
 
 
 # Next weeks matchup
@@ -1854,6 +2039,19 @@ if query_next_week_matchup:
                                                                         axis=0))
     except ValueError:
         st.table(next_matchup_daily_game_count_dataframe)
+
+    if next_matchup_team1_dict == af.NUNN_OF_YALL_BETTA:
+        next_matchup_team2_dict = next_matchup_team2_dict
+    else:
+        next_matchup_team2_dict = next_matchup_team1_dict
+        next_matchup_team1_dict = next_matchup_team2_dict
+
+    simulated_cats = matchup_simulation(next_matchup_team1_dict, next_matchup_team2_dict,
+                                        n_reps=100000, week="next", include_injured=False)
+
+    st.table(simulated_cats.applymap(np.int64).astype(str) + '%')
+
+
 
 
 # Streamlit Code
